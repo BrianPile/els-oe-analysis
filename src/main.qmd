@@ -12,6 +12,9 @@ editor_options:
   chunk_output_type: console
 ---
 
+
+
+
 ```{r}
 #| label: setup
 #| message: false
@@ -23,6 +26,11 @@ library(loadr)
 theme_set(theme_bw())
 source(here("local_config.R"))
 source(here("src/local_data_wrangling.R"))
+
+
+# TODO: OE-level pass/fail analysis, including KINK
+# TODO: burn in analysis
+# TODO: make my own cdf plots
 
 ```
 
@@ -39,8 +47,9 @@ if (!file.exists(here("data/processed", filename_iv))) {
 df_mpd_iv = data.table::fread(file = here("data/processed", filename_iv)) |> 
   as_tibble() |> 
   mutate(
+    ch = as.character(ch),
     dut_id = paste(sep = "-", fc_id, ch),
-    ch = as.character(ch)
+    .after = ch
   )
 
 
@@ -54,8 +63,9 @@ if (!file.exists(here("data/processed", filename_liv))) {
 df_liv = data.table::fread(file = here("data/processed", filename_liv)) |> 
   as_tibble() |> 
   mutate(
+    ch = as.character(ch),
     dut_id = paste(sep = "-", fc_id, ch),
-    ch = as.character(ch)
+    .after = ch
   )
 
 #### OSA ####
@@ -78,8 +88,27 @@ rm(filename_iv, filename_liv, filename_osa)
 ```
 
 ```{r}
+#| label: data-filtering
+
+# If a measurement was run more than once, keep only the last one. The last one
+# should have the largest test_id increment.
+
+df_mpd_iv = df_mpd_iv |> 
+  group_by(dut_id) |> 
+  filter(test_id == max(test_id)) |> 
+  ungroup()
+
+df_liv = df_liv |> 
+  group_by(bi_status, dut_id) |> 
+  filter(test_id == max(test_id)) |> 
+  ungroup()
+
+```
+
+```{r}
 #| label: data-summarization
 
+#### MPD ####
 df_summary_mpd = df_mpd_iv |> 
   group_by(across(!c(voltage, current))) |> 
   summarize(
@@ -89,6 +118,24 @@ df_summary_mpd = df_mpd_iv |>
   )
 
 
+#### LIV ####
+df_summary_liv = df_liv |> 
+  group_by(across(!c(current, power, voltage, mpd_current))) |> 
+  summarize(
+    Ith1d = extract_ith_from_pi(current, power)[[1]] /1e-3,
+    Pf400 = extract_pf_from_pi(current, power, I0 = 400e-3) /1e-3,
+    Vf400 = extract_vf_from_vi(current, voltage, I0 = 400e-3),
+    df_kink = extract_kink_from_pi(current, power, Istart = 250e-3, Istop = 495e-3, plot_debug = FALSE),
+    .groups = "drop"
+  ) |> 
+  unpack(cols = df_kink) |> 
+  mutate(Ikink = Ikink/1e-3)
+
+
+#### OSA ####
+# TODO: add Pp, BW20dB ?
+# TODO: fix load_osa temperature extraction
+
 df_summary_osa = df_osa |> 
   group_by(across(!c(wavelength, power))) |> 
   summarize(
@@ -97,9 +144,40 @@ df_summary_osa = df_osa |>
     .groups = "drop"
   )
 
+df_summary_osa_wide = df_summary_osa |> 
+  group_by(dut_id, test_id) |> 
+  mutate(If_index = seq_along(If)) |> 
+  ungroup() |> 
+  pivot_wider(
+    names_from = If_index,
+    values_from = c(If, Lp, SMSR),
+    names_sep = ""
+  ) |> 
+  arrange(dut_id) |> 
+  print(n = Inf)
+
+#### SUMMARY ####
+
+
+
+
 ```
 
-# Performance Characterization
+```{r}
+#| label: summary-stats
+
+df_stats = df_summary_liv |> 
+  select(Ith1d, Pf400, Vf400)
+
+```
+
+
+
+
+# Parametric Summary
+
+
+# Characteristic Plots
 
 ## Sweep Data
 
@@ -212,11 +290,6 @@ df_osa |>
 
 ```
 
-:::
-
-## Parametric Data
-
-:::{.panel-tabset}
 
 ### Peak WL
 
@@ -268,5 +341,88 @@ df_summary_osa |>
 
 ```
 
+:::
+
+## Parametric Data
+
+:::{.panel-tabset}
+
+### Ith
+
+```{r}
+#| label: cdf-ith
+
+df_summary_liv |> 
+  filter(bi_status == "pre") |> 
+  ggplot(aes(x = Ith1d, color = ch)) +
+  stat_ecdf(pad = FALSE, geom = "point") +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(
+    title = str_glue("{work_order} Threshold Current CDF, 50C"),
+    x = "Ith1d (mA)",
+    y = "Cumulative Probability (%)"
+  )
+
+```
+
+### Pf400
+
+```{r}
+#| label: cdf-pf400
+
+df_summary_liv |> 
+  filter(bi_status == "pre") |> 
+  ggplot(aes(x = Pf400, color = ch)) +
+  stat_ecdf(pad = FALSE, geom = "point") +
+  geom_vline(xintercept = 80) +
+  scale_x_continuous(breaks = seq(0, 200, 20)) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(
+    title = str_glue("{work_order} Output Power CDF, 400mA, 50C"),
+    x = "Pf400 (mW)",
+    y = "Cumulative Probability (%)"
+  )
+
+```
+
+### Vf400
+
+```{r}
+#| label: cdf-vf400
+
+df_summary_liv |> 
+  filter(bi_status == "pre") |> 
+  ggplot(aes(x = Vf400, color = ch)) +
+  stat_ecdf(pad = FALSE, geom = "point") +
+  geom_vline(xintercept = 2.0) +
+  scale_x_continuous(breaks = seq(0, 10, 0.4)) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(
+    title = str_glue("{work_order} Foward Voltage CDF, 400mA, 50C"),
+    x = "Vf400 (V)",
+    y = "Cumulative Probability (%)"
+  )
+
+```
+
+### Kink
+
+```{r}
+#| label: cdf-kink
+
+df_summary_liv |> 
+  filter(bi_status == "pre") |> 
+  ggplot(aes(x = KINK, color = ch)) +
+  geom_vline(xintercept = c(-30, 30)) +
+  scale_x_continuous(breaks = seq(-1e3, 1e3, 20)) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  stat_ecdf(pad = FALSE, geom = "point") +
+  labs(
+    title = str_glue("{work_order} Kink Deviation CDF, 250-495mA, 50C"),
+    x = "Kink (%)",
+    y = "Cumulative Probability (%)"
+  )
+
+```
 
 :::
