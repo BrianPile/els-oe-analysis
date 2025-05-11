@@ -1,0 +1,272 @@
+---
+title: "ELS OE work order auto reporter"
+author: "Brian Pile"
+format:
+  html:
+    toc: true
+editor: source
+execute: 
+  echo: false
+embed-resources: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+#| label: setup
+#| message: false
+
+suppressPackageStartupMessages(library(tidyverse))
+library(here)
+library(devparext)
+library(loadr)
+theme_set(theme_bw())
+source(here("local_config.R"))
+source(here("src/local_data_wrangling.R"))
+
+```
+
+```{r}
+#| label: load-processed-data
+
+#### MPD IV ####
+filename_iv = paste(work_order, "MPD IV combined data.csv")
+if (!file.exists(here("data/processed", filename_iv))) {
+  message("Wrangling MPD!!!")
+  wrangle_mpd(filename = here("data/processed", filename_iv))
+}
+
+df_mpd_iv = data.table::fread(file = here("data/processed", filename_iv)) |> 
+  as_tibble() |> 
+  mutate(
+    dut_id = paste(sep = "-", fc_id, ch),
+    ch = as.character(ch)
+  )
+
+
+#### LIV ####
+filename_liv = paste(work_order, "LIV combined data.csv")
+if (!file.exists(here("data/processed", filename_liv))) {
+  message("Wrangling LIV!!!")
+  wrangle_liv(filename = here("data/processed", filename_liv))
+}
+
+df_liv = data.table::fread(file = here("data/processed", filename_liv)) |> 
+  as_tibble() |> 
+  mutate(
+    dut_id = paste(sep = "-", fc_id, ch),
+    ch = as.character(ch)
+  )
+
+#### OSA ####
+filename_osa = paste(work_order, "OSA combined data.csv")
+if (!file.exists(here("data/processed", filename_osa))) {
+  message("Wrangling OSA!!!")
+  wrangle_osa(filename = here("data/processed", filename_osa))
+}
+
+df_osa = data.table::fread(file = here("data/processed", filename_osa)) |> 
+  as_tibble() |> 
+  mutate(
+    dut_id = paste(sep = "-", fc_id, ch),
+    ch = as.character(ch)
+  )
+
+# cleanup some variables
+rm(filename_iv, filename_liv, filename_osa)
+
+```
+
+```{r}
+#| label: data-summarization
+
+df_summary_mpd = df_mpd_iv |> 
+  group_by(across(!c(voltage, current))) |> 
+  summarize(
+    Idark = extract_i_from_iv(voltage, current, V0 = -2),
+    If = extract_i_from_iv(voltage, current, V0 = 1),
+    .groups = "drop"
+  )
+
+
+df_summary_osa = df_osa |> 
+  group_by(across(!c(wavelength, power))) |> 
+  summarize(
+    Lp = extract_peak_wav(wavelength, power),
+    SMSR = extract_smsr(wavelength, power),
+    .groups = "drop"
+  )
+
+```
+
+# Performance Characterization
+
+## Sweep Data
+
+:::{.panel-tabset}
+
+### LI curves
+
+```{r}
+#| label: li-curves
+#| fig-width: 8
+#| fig-height: 8
+
+df_liv |> 
+  group_by(dut_id) |> 
+  filter(test_id == max(test_id)) |> 
+  ungroup() |> 
+  filter(bi_status == "pre") |> 
+  ggplot(aes(x = current/1e-3, y = power/1e-3, color = ch)) +
+  geom_path() +
+  coord_cartesian(ylim = c(0, 120)) +
+  scale_y_continuous(breaks = seq(0, 200, 20)) +
+  facet_wrap(~ fc_id) +
+  labs(
+    title = str_glue("{work_order} LI curves, 50C"),
+    x = "Current (mA)",
+    y = "Power (mW)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1)),
+    axis.text.x = element_text(angle = -90)
+  )
+
+```
+
+### VI curves
+
+```{r}
+#| label: vi-curves
+#| fig-width: 8
+#| fig-height: 8
+
+df_liv |> 
+  group_by(dut_id) |> 
+  filter(test_id == max(test_id)) |> 
+  ungroup() |> 
+  filter(bi_status == "pre") |> 
+  ggplot(aes(x = current/1e-3, y = voltage, color = ch)) +
+  geom_path() +
+  coord_cartesian(ylim = c(0, 2)) +
+  scale_y_continuous(breaks = seq(0, 3, 0.4)) +
+  facet_wrap(~ fc_id) +
+  labs(
+    title = str_glue("{work_order} VI curves, 50C"),
+    x = "Current (mA)",
+    y = "Voltage (V)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1)),
+    axis.text.x = element_text(angle = -90)
+  )
+
+```
+
+### MPD IV curves
+
+```{r}
+#| label: mpd-iv-curves
+#| fig-width: 8
+#| fig-height: 8
+
+df_mpd_iv |> 
+  ggplot(aes(x = voltage, y = log10(abs(current)), color = ch)) +
+  geom_line() +
+  coord_cartesian(ylim = c(-12, -2)) +
+  scale_y_continuous(breaks = seq(-12, 0, 3)) +
+  facet_wrap( ~ fc_id) +
+  labs(
+    title = str_glue("{work_order} MPD IV curves, 50C"),
+    x = "Voltage (V)",
+    y = "Log10 Current (A)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1))
+  )
+
+```
+
+### Spectra
+
+```{r}
+#| label: spectra
+#| fig-width: 8
+#| fig-height: 8
+
+df_osa |> 
+  filter(If == 400e-3,
+         wavelength |> between(1565, 1585)) |> 
+  ggplot(aes(x = wavelength, y = power, color = ch)) +
+  geom_path() +
+  coord_cartesian(ylim = c(-80, 20)) +
+  facet_wrap(~ fc_id) +
+  labs(
+    title = str_glue("{work_order} Spectra, 400mA, 50C"),
+    x = "Wavelength (nm)",
+    y = "Power (dBm)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1))
+  )
+
+```
+
+:::
+
+## Parametric Data
+
+:::{.panel-tabset}
+
+### Peak WL
+
+```{r}
+#| label: peak-wl
+#| fig-width: 8
+#| fig-height: 8
+
+df_summary_osa |> 
+  ggplot(aes(x = If/1e-3, y = Lp, color = ch)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ fc_id) +
+  labs(
+    title = str_glue("{work_order} Peak WL, 50C"),
+    x = "Current (mA)",
+    y = "Lp (nm)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1)),
+    axis.text.x = element_text(angle = -90)
+  )
+
+```
+
+### SMSR
+
+```{r}
+#| label: smsr
+#| fig-width: 8
+#| fig-height: 8
+
+df_summary_osa |> 
+  ggplot(aes(x = If/1e-3, y = SMSR, color = ch)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 35) +
+  coord_cartesian(ylim = c(0, 70)) +
+  facet_wrap(~ fc_id) +
+  labs(
+    title = str_glue("{work_order} SMSR, 50C"),
+    x = "Current (mA)",
+    y = "SMSR (dB)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1)),
+    axis.text.x = element_text(angle = -90)
+  )
+
+```
+
+
+:::

@@ -2,3 +2,16 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# macOS system files
+.DS_Store
+
+# html files in all directories
+**/*.html
+
+# local files that should not be pushed
+src/local_data_wrangling.R
+local_config.R
+
+# ignore data
+data
