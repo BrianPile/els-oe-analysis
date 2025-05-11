@@ -1,2 +1,2 @@
 # els-oe-analysis
-Automated ELS optical engine analysis and report generation
+Automated analysis and report generation for ELS optical engines
