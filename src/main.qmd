@@ -25,9 +25,10 @@ theme_set(theme_bw())
 source(here("local_config.R"))
 source(here("src/local_data_wrangling.R"))
 
-# TODO: OE-level pass/fail analysis, including KINK
 # TODO: burn in analysis
+# TODO: add pre burn in yield and OE burn in picklist
 # TODO: add MPD Ipd curves
+# TODO: add mpd Idark to df_summary AND pf_Idark to pf judgement
 
 ```
 
@@ -79,7 +80,8 @@ df_liv = data.table::fread(file = here("data/processed", filename_liv)) |>
     ch = as.character(ch),
     dut_id = paste(sep = "-", fc_id, ch),
     .after = ch
-  )
+  ) |> 
+  mutate(bi_status = fct_relevel(bi_status, "pre", "post"))
 
 #### OSA ####
 filename_osa = paste(work_order, "OSA combined data.csv")
@@ -125,6 +127,7 @@ df_osa = df_osa |>
 
 ```{r}
 #| label: data-summarization
+#| message: false
 
 #### MPD ####
 df_summary_mpd = df_mpd_iv |> 
@@ -169,8 +172,7 @@ df_summary_osa_wide = df_summary_osa |>
     values_from = c(If_osa, Lp, SMSR),
     names_sep = ""
   ) |> 
-  arrange(dut_id) |> 
-  print(n = 10)
+  arrange(dut_id)
 
 #### SUMMARY ####
 df_summary = left_join(
@@ -185,7 +187,7 @@ df_summary = left_join(
 ```{r}
 #| label: summary-stats
 
-# TODO: add spectral data, but it needs to come from post burn in testing
+# TODO: add spectral data, but it needs to come from post burn in testing. no pre burn in data taken
 
 df_stats_liv = df_summary |> 
   filter(bi_status == "pre") |> 
@@ -215,13 +217,13 @@ df_stats_liv = df_summary |>
 
 df_summary = df_summary |> 
   mutate(
-    pf_Ith = if_else(Ith1d <=30, TRUE, FALSE, FALSE),
-    pf_Vf_lo  = if_else(Vf2 >= 1.2, TRUE, FALSE, FALSE),
-    pf_Vf_hi  = if_else(Vf2 <= 2.0, TRUE, FALSE, FALSE),
-    pf_Pf  = if_else(Pf2 >= 80, TRUE, FALSE, FALSE),
-    pf_KINK = if_else(abs(KINK) <= 30, TRUE, FALSE, FALSE),
-    pf_SMSR = if_else(SMSR2 >= 35, TRUE, FALSE, FALSE),
-    pf_final = if_all(pf_Ith:pf_SMSR)
+    pf_Ith    = if_else(Ith1d <=30,        TRUE, FALSE, FALSE),
+    pf_Vf_lo  = if_else(Vf2 >= 1.2,        TRUE, FALSE, FALSE),
+    pf_Vf_hi  = if_else(Vf2 <= 2.0,        TRUE, FALSE, FALSE),
+    pf_Pf     = if_else(Pf2 >= 80,         TRUE, FALSE, FALSE),
+    pf_KINK   = if_else(abs(KINK) <= 30,   TRUE, FALSE, FALSE),
+    pf_SMSR   = if_else(SMSR2 >= 35,       TRUE, FALSE, FALSE),
+    pf_final  = if_all(pf_Ith:pf_SMSR)
   )
 
 ```
@@ -608,4 +610,37 @@ df_summary_osa |>
 
 :::
 
+# Burn In
+
+```{r}
+#| label: bi-change
+
+df_summary_liv2 = df_summary_liv |> 
+  mutate(
+    .by = c(dut_id),
+    dIth1d_pct = 100 * (Ith1d/first(Ith1d, order_by = bi_status) - 1),
+    dPf2_pct = 100 * (Pf2/first(Pf2, order_by = bi_status) - 1)
+  )
+  
+df_summary_liv2 |>
+  select(dut_id, bi_status, contains("Ith1d"), contains("Pf2")) |> 
+  arrange(dut_id, bi_status) |> 
+  print(n = Inf)
+
+```
+
+
+```{r}
+
+df_summary_liv2 |> 
+  ggplot(aes(x = bi_status, y = dPf2_pct, group = dut_id)) +
+  geom_line(alpha = 0.5) +
+  geom_hline(yintercept = c(-10, 10))
+
+```
+
+```{r}
+# df_summary_liv2 |> 
+#   ggplot(aes(x = bi))
+```
 
