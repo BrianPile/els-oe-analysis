@@ -12,9 +12,6 @@ editor_options:
   chunk_output_type: console
 ---
 
-
-
-
 ```{r}
 #| label: setup
 #| message: false
@@ -30,9 +27,25 @@ source(here("src/local_data_wrangling.R"))
 
 # TODO: OE-level pass/fail analysis, including KINK
 # TODO: burn in analysis
-# TODO: make my own cdf plots
+# TODO: add MPD Ipd curves
 
 ```
+
+```{r}
+#| label: helper-functions
+
+plot_cdf = function(data, group_var, value_var) {
+  data |>
+    group_by({{ group_var }}) |>
+    arrange({{ group_var }}, {{ value_var }}) |>
+    mutate(cdf = seq(1 / n(), 1, length.out = n())) |>
+    ggplot(aes(x = {{ value_var }}, y = cdf, color = {{ group_var }})) +
+    geom_line() +
+    geom_point()
+}
+
+```
+
 
 ```{r}
 #| label: load-processed-data
@@ -103,6 +116,11 @@ df_liv = df_liv |>
   filter(test_id == max(test_id)) |> 
   ungroup()
 
+df_osa = df_osa |> 
+  group_by(bi_status, dut_id) |> 
+  filter(test_id == max(test_id)) |> 
+  ungroup()
+
 ```
 
 ```{r}
@@ -119,22 +137,17 @@ df_summary_mpd = df_mpd_iv |>
 
 
 #### LIV ####
+If_vec = c(100, 400)*1e-3
+Ix_vec = c(50)*1e-3
+Pop_vec = c(80)*1e-3
 df_summary_liv = df_liv |> 
   group_by(across(!c(current, power, voltage, mpd_current))) |> 
-  summarize(
-    Ith1d = extract_ith_from_pi(current, power)[[1]] /1e-3,
-    Pf400 = extract_pf_from_pi(current, power, I0 = 400e-3) /1e-3,
-    Vf400 = extract_vf_from_vi(current, voltage, I0 = 400e-3),
-    df_kink = extract_kink_from_pi(current, power, Istart = 250e-3, Istop = 495e-3, plot_debug = FALSE),
-    .groups = "drop"
-  ) |> 
-  unpack(cols = df_kink) |> 
-  mutate(Ikink = Ikink/1e-3)
+  summarize_raw_liv_data(If_vec, Ix_vec, Pop_vec, Ik1 = 250, Ik2 = 495) |> 
+  ungroup()
 
 
 #### OSA ####
 # TODO: add Pp, BW20dB ?
-# TODO: fix load_osa temperature extraction
 
 df_summary_osa = df_osa |> 
   group_by(across(!c(wavelength, power))) |> 
@@ -145,19 +158,22 @@ df_summary_osa = df_osa |>
   )
 
 df_summary_osa_wide = df_summary_osa |> 
+  rename(If_osa = If) |> 
+  filter(If_osa %in% c(100e-3, 400e-3)) |> 
   group_by(dut_id, test_id) |> 
-  mutate(If_index = seq_along(If)) |> 
+  mutate(If_index = seq_along(If_osa),
+         If_osa = If_osa/1e-3) |> 
   ungroup() |> 
   pivot_wider(
     names_from = If_index,
-    values_from = c(If, Lp, SMSR),
+    values_from = c(If_osa, Lp, SMSR),
     names_sep = ""
   ) |> 
   arrange(dut_id) |> 
-  print(n = Inf)
+  print(n = 10)
 
 #### SUMMARY ####
-
+df_summary = left_join(df_summary_liv, df_summary_osa_wide)
 
 
 
@@ -166,15 +182,31 @@ df_summary_osa_wide = df_summary_osa |>
 ```{r}
 #| label: summary-stats
 
-df_stats = df_summary_liv |> 
-  select(Ith1d, Pf400, Vf400)
+df_stats = df_summary |> 
+  select(Ith1d, Pf2, Vf2, KINK) |> 
+  mutate(
+    KINK = abs(KINK),
+    # KINK = if_else(KINK>10000, 10000, KINK)
+  ) |>
+  pivot_longer(
+    cols = everything()
+  ) |> 
+  summarize(
+    .by = name,
+    `NA` = sum(is.na(value), na.rm = TRUE),
+    outliers = sum(!isnt_outlier_tukey(value, na.rm = TRUE), na.rm = TRUE),
+    mean = mean(value, na.rm = TRUE),
+    sd = sd(value, na.rm = TRUE),
+    quant = as_tibble_row(quantile(value, na.rm = TRUE))
+  ) |> 
+  unpack(quant) |> 
+  rename_with(\(x) paste0("p", str_remove(x, "%")), contains("%"))
 
 ```
 
 
-
-
 # Parametric Summary
+
 
 
 # Characteristic Plots
@@ -354,8 +386,7 @@ df_summary_osa |>
 
 df_summary_liv |> 
   filter(bi_status == "pre") |> 
-  ggplot(aes(x = Ith1d, color = ch)) +
-  stat_ecdf(pad = FALSE, geom = "point") +
+  plot_cdf(group_var = ch, value_var = Ith1d) +
   scale_y_continuous(labels = scales::label_percent()) +
   labs(
     title = str_glue("{work_order} Threshold Current CDF, 50C"),
@@ -372,8 +403,7 @@ df_summary_liv |>
 
 df_summary_liv |> 
   filter(bi_status == "pre") |> 
-  ggplot(aes(x = Pf400, color = ch)) +
-  stat_ecdf(pad = FALSE, geom = "point") +
+  plot_cdf(group_var = ch, value_var = Pf2) +
   geom_vline(xintercept = 80) +
   scale_x_continuous(breaks = seq(0, 200, 20)) +
   scale_y_continuous(labels = scales::label_percent()) +
@@ -392,8 +422,7 @@ df_summary_liv |>
 
 df_summary_liv |> 
   filter(bi_status == "pre") |> 
-  ggplot(aes(x = Vf400, color = ch)) +
-  stat_ecdf(pad = FALSE, geom = "point") +
+  plot_cdf(group_var = ch, value_var = Vf2) +
   geom_vline(xintercept = 2.0) +
   scale_x_continuous(breaks = seq(0, 10, 0.4)) +
   scale_y_continuous(labels = scales::label_percent()) +
@@ -412,17 +441,40 @@ df_summary_liv |>
 
 df_summary_liv |> 
   filter(bi_status == "pre") |> 
-  ggplot(aes(x = KINK, color = ch)) +
-  geom_vline(xintercept = c(-30, 30)) +
+  mutate(KINK = abs(KINK)) |> 
+  plot_cdf(group_var = ch, value_var = KINK) +
+  geom_vline(xintercept = c(30)) +
+  coord_cartesian(xlim = c(0, NA)) +
   scale_x_continuous(breaks = seq(-1e3, 1e3, 20)) +
   scale_y_continuous(labels = scales::label_percent()) +
-  stat_ecdf(pad = FALSE, geom = "point") +
   labs(
     title = str_glue("{work_order} Kink Deviation CDF, 250-495mA, 50C"),
-    x = "Kink (%)",
+    x = "|Kink| (%)",
+    y = "Cumulative Probability (%)"
+  )
+
+```
+
+### SMSR
+
+```{r}
+#| label: cdf-smsr
+
+df_summary_osa |> 
+  filter(If == 400e-3) |> 
+  plot_cdf(group_var = ch, value_var = SMSR) +
+  geom_vline(xintercept = c(35)) +
+  coord_cartesian(xlim = c(0, 70)) +
+  scale_x_continuous(breaks = seq(0, 100, 10)) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(
+    title = str_glue("{work_order} SMSR CDF, 400mA, 50C"),
+    x = "SMSR (dB)",
     y = "Cumulative Probability (%)"
   )
 
 ```
 
 :::
+
+
