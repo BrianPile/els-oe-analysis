@@ -17,13 +17,13 @@ editor_options:
 #| message: false
 
 suppressPackageStartupMessages(library(tidyverse))
+library(gt)
 library(here)
 library(devparext)
 library(loadr)
 theme_set(theme_bw())
 source(here("local_config.R"))
 source(here("src/local_data_wrangling.R"))
-
 
 # TODO: OE-level pass/fail analysis, including KINK
 # TODO: burn in analysis
@@ -173,16 +173,22 @@ df_summary_osa_wide = df_summary_osa |>
   print(n = 10)
 
 #### SUMMARY ####
-df_summary = left_join(df_summary_liv, df_summary_osa_wide)
-
-
+df_summary = left_join(
+  x = df_summary_liv,
+  y = df_summary_osa_wide,
+  by = join_by(bi_status, fc_id, ch, dut_id, temperature),
+  suffix = c(".liv", ".osa")
+)
 
 ```
 
 ```{r}
 #| label: summary-stats
 
-df_stats = df_summary |> 
+# TODO: add spectral data, but it needs to come from post burn in testing
+
+df_stats_liv = df_summary |> 
+  filter(bi_status == "pre") |> 
   select(Ith1d, Pf2, Vf2, KINK) |> 
   mutate(
     KINK = abs(KINK),
@@ -204,9 +210,134 @@ df_stats = df_summary |>
 
 ```
 
+```{r}
+#| label: performance-pf-judgement
 
-# Parametric Summary
+df_summary = df_summary |> 
+  mutate(
+    pf_Ith = if_else(Ith1d <=30, TRUE, FALSE, FALSE),
+    pf_Vf_lo  = if_else(Vf2 >= 1.2, TRUE, FALSE, FALSE),
+    pf_Vf_hi  = if_else(Vf2 <= 2.0, TRUE, FALSE, FALSE),
+    pf_Pf  = if_else(Pf2 >= 80, TRUE, FALSE, FALSE),
+    pf_KINK = if_else(abs(KINK) <= 30, TRUE, FALSE, FALSE),
+    pf_SMSR = if_else(SMSR2 >= 35, TRUE, FALSE, FALSE),
+    pf_final = if_all(pf_Ith:pf_SMSR)
+  )
 
+```
+
+
+# Summary
+
+## Summary Stats
+
+```{r}
+#| label: table-stats
+
+df_stats_liv |> 
+  gt(rowname_col = "name") |> 
+  tab_header(
+    title = "Summary Statistics",
+    subtitle = paste0("N = ", df_liv$dut_id |> unique() |> length(), " devices")
+  ) |> 
+  tab_stubhead(label = "Parameter") |> 
+  fmt_number(
+    decimals = 0
+  ) |> 
+  text_replace(
+    pattern = "Ith1d", replacement = "Threshold Current (mA)", locations = cells_stub()
+  ) |> 
+  text_replace(
+    pattern = "Pf3_cal", replacement = "Output Power (mW)", locations = cells_stub()
+  ) |> 
+  text_replace(
+    pattern = "Vf3", replacement = "Forward Voltage, (V)", locations = cells_stub()
+  ) |> 
+  text_replace(
+    pattern = "SMSR3", replacement = "Side Mode Suppression Ratio (dB)", locations = cells_stub()
+  ) |> 
+  text_replace(
+    pattern = "Lp3_cal", replacement = "Peak Wavelength (nm)", locations = cells_stub()
+  ) |> 
+  text_replace(
+    pattern = "KINK", replacement = "Kink Deviation (%)", locations = cells_stub()
+  ) |> 
+  fmt_number(
+    rows = everything(),
+    columns = everything(),
+    sep_mark = "",
+    decimals = 0
+  ) |> 
+  fmt_number(
+    rows = 3,
+    columns = -c(1:3),
+    sep_mark = ""
+  )
+
+```
+
+## Pass/Fail
+
+```{r}
+#| label: pf-tile-1
+#| fig-width: 8
+#| fig-height: 10
+
+df_summary |> 
+  filter(bi_status == "pre") |> 
+  pivot_longer(
+    cols = c(starts_with("pf_")),
+    names_prefix = "pf_"
+  ) |> 
+  mutate(
+    name = fct_relevel(name, "Ith", "Vf_lo", "Vf_hi", "Pf", "KINK", "SMSR", "final"),
+    chunk_num = ntile(row_number(), 2)
+  ) |>
+  ggplot(aes(x = name, y = dut_id, fill = value)) +
+  geom_tile(color = "black", show.legend = FALSE) +
+  scale_y_discrete(limits=rev) +
+  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
+  facet_wrap(~ chunk_num, scales = "free_y") +
+  labs(
+    title = str_glue("{work_order} Pass/Fail Tile")
+  ) +
+  theme(
+    axis.title = element_blank(),
+    axis.text.y = element_text(size = 7),
+    strip.text = element_blank()
+  )
+
+```
+
+
+```{r}
+#| label: pf-tile-2
+#| fig-width: 8
+#| fig-height: 8
+
+df_summary |> 
+  filter(bi_status == "pre") |> 
+  pivot_longer(
+    cols = c(starts_with("pf_")),
+    names_prefix = "pf_"
+  ) |> 
+  mutate(
+    name = fct_relevel(name, "Ith", "Vf_lo", "Vf_hi", "Pf", "KINK", "SMSR", "final"),
+  ) |>
+  ggplot(aes(x = name, y = ch, fill = value)) +
+  geom_tile(color = "black", show.legend = FALSE) +
+  scale_y_discrete(limits=rev) +
+  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
+  # facet_wrap(~ chunk_num, scales = "free_y") +
+  facet_wrap(~ fc_id) +
+  theme(
+    axis.title = element_blank(),
+    axis.text.x = element_text(angle = -90),
+    # axis.text.y = element_text(size = 7)
+  )
+
+
+```
 
 
 # Characteristic Plots
