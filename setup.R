@@ -1,7 +1,7 @@
 # setup.R - Run this after cloning the repository
 
 # Create necessary directories for the project
-dirs <- c("src", "doc", "data/raw", "data/processed")
+dirs <- c("src", "doc", "data/raw", "data/processed", "data/output")
 
 for (dir in dirs) {
   if (!dir.exists(dir)) {

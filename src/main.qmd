@@ -147,7 +147,8 @@ Pop_vec = c(80)*1e-3
 df_summary_liv = df_liv |> 
   group_by(across(!c(current, power, voltage, mpd_current))) |> 
   summarize_raw_liv_data(If_vec, Ix_vec, Pop_vec, Ik1 = 250, Ik2 = 495) |> 
-  ungroup()
+  ungroup() |> 
+  mutate(across(matches("^Pf\\d$"), \(x) 10*log10(abs(x)), .names = "{.col}_dBm"), .after = Pf2)
 
 
 #### OSA ####
@@ -231,6 +232,16 @@ df_summary = df_summary |>
 
 ```
 
+```{r}
+#| label: output-summary-data
+
+df_summary |> 
+  mutate(across(where(is.numeric), \(x) round(x, 3))) |> 
+  data.table::fwrite(file = here("data/output", str_glue("{work_order} summary data.csv")))
+
+message("Created output summary data csv file!!!")
+
+```
 
 ```{r}
 #| label: summary-stats
