@@ -109,10 +109,10 @@ rm(filename_iv, filename_liv, filename_osa)
 # If a measurement was run more than once, keep only the last one. The last one
 # should have the largest test_id increment.
 
-df_mpd_iv = df_mpd_iv |> 
-  group_by(dut_id) |> 
-  filter(test_id == max(test_id)) |> 
-  ungroup()
+# df_mpd_iv = df_mpd_iv |> 
+#   group_by(dut_id) |> 
+#   filter(test_id == max(test_id)) |> 
+#   ungroup()
 
 df_liv = df_liv |> 
   group_by(bi_status, dut_id) |> 
