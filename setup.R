@@ -41,7 +41,7 @@ if (!file.exists(file.path("src", wrangle_file))) {
 #### MPD IV ####
 wrangle_mpd = function(filename) {
   iv_files = list.files(
-    path = "data/raw",
+    path = here("data/raw"),
     pattern = "^\\\\d{2}FC\\\\d{4,5}_CH\\\\d[.]csv$",
     full.names = TRUE,
     recursive = TRUE
@@ -59,7 +59,7 @@ wrangle_mpd = function(filename) {
 #### LIV ####
 wrangle_liv = function(filename) {
   liv_files = list.files(
-    path = "data/raw",
+    path = here("data/raw"),
     pattern = "_LIV[.]xlsx$|_LIV[.]csv$",
     full.names = TRUE,
     recursive = TRUE
@@ -77,7 +77,7 @@ wrangle_liv = function(filename) {
 #### OSA ####
 wrangle_osa = function(filename) {
   osa_files = list.files(
-    path = "data/raw",
+    path = here("data/raw"),
     pattern = "_OSA[.]xlsx$|_OSA[.]csv",
     full.names = TRUE,
     recursive = TRUE

@@ -223,9 +223,9 @@ df_summary = df_summary |>
 ```{r}
 #| label: pf-judgement-oe
 
-# TODO: somehow add a column saying if that OE passed as a whole
-df_summary = df_summary |> 
-  group_by(fc_id)
+# # TODO: somehow add a column saying if that OE passed as a whole
+# df_summary = df_summary |> 
+#   group_by(fc_id)
 
 
 
