@@ -9,7 +9,7 @@ execute:
   echo: false
 embed-resources: true
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 ```{r}
@@ -271,9 +271,6 @@ df_stats_liv = df_summary |>
 
 ```
 
-
-
-
 # Summary
 
 ## Summary Stats
@@ -389,6 +386,9 @@ df_summary |>
 ```{r}
 #| label: pf-tile-3
 
+facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
+          "dIth1d", "dPf2")
+
 df_summary |> 
   filter(bi_status == "pre") |> 
   select(fc_id, ch, dut_id, starts_with("pf_")) |> 
@@ -404,7 +404,7 @@ df_summary |>
   facet_wrap(~ name, nrow = 1) +
   labs(
     title = str_glue("{work_order} pre burn in parametric summary")
-  )
+  ) +
   theme(
     axis.title = element_blank(),
     axis.text = element_text(size = 8),
@@ -412,7 +412,6 @@ df_summary |>
   )
 
 ```
-
 
 # Characteristic Plots
 
@@ -826,7 +825,7 @@ df_summary |>
   facet_wrap(~ name, nrow = 1) +
   labs(
     title = str_glue("{work_order} post burn in parametric summary")
-  )
+  ) +
   theme(
     axis.title = element_blank(),
     axis.text = element_text(size = 8),
@@ -835,9 +834,4 @@ df_summary |>
 
 ```
 
-
-
-
-
 :::
-
