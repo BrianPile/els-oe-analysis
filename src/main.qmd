@@ -183,7 +183,7 @@ df_summary = left_join(
   by = join_by(work_order, bi_status, fc_id, ch, dut_id, temperature),
   suffix = c(".liv", ".osa")
 ) |> 
-  arrange(dut_id, bi_status) |> print()
+  arrange(dut_id, bi_status)
 
 ```
 
@@ -192,12 +192,12 @@ df_summary = left_join(
 
 df_summary = df_summary |> 
   mutate(
-    pf_Ith    = if_else(Ith1d <=30,        TRUE, FALSE, FALSE),
-    pf_Vf_lo  = if_else(Vf2 >= 1.2,        TRUE, FALSE, FALSE),
-    pf_Vf_hi  = if_else(Vf2 <= 2.0,        TRUE, FALSE, FALSE),
-    pf_Pf     = if_else(Pf2 >= 80,         TRUE, FALSE, FALSE),
-    pf_KINK   = if_else(abs(KINK) <= 30,   TRUE, FALSE, FALSE),
-    pf_SMSR   = if_else(SMSR2 >= 35,       TRUE, FALSE, FALSE),
+    pf_Ith    = if_else(Ith1d <=30,        TRUE, FALSE, NA),
+    pf_Vf_lo  = if_else(Vf2 >= 1.2,        TRUE, FALSE, NA),
+    pf_Vf_hi  = if_else(Vf2 <= 2.0,        TRUE, FALSE, NA),
+    pf_Pf     = if_else(Pf2 >= 80,         TRUE, FALSE, NA),
+    pf_KINK   = if_else(abs(KINK) <= 30,   TRUE, FALSE, NA),
+    pf_SMSR   = if_else(SMSR2 >= 35,       TRUE, FALSE, NA),
     pf_specs  = if_all(pf_Ith:pf_SMSR)
   )
 
@@ -383,6 +383,33 @@ df_summary |>
     # axis.text.y = element_text(size = 7)
   )
 
+
+```
+
+```{r}
+#| label: pf-tile-3
+
+df_summary |> 
+  filter(bi_status == "pre") |> 
+  select(fc_id, ch, dut_id, starts_with("pf_")) |> 
+  pivot_longer(
+    cols = starts_with("pf_"),
+    names_prefix = "pf_"
+  ) |> 
+  mutate(name = fct_relevel(name, facts)) |> 
+  ggplot(aes(x = ch, y = fc_id, fill = value)) +
+  geom_tile(color = "black", show.legend = FALSE) +
+  scale_y_discrete(limits = rev) +
+  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
+  facet_wrap(~ name, nrow = 1) +
+  labs(
+    title = str_glue("{work_order} pre burn in parametric summary")
+  )
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_text(size = 8),
+    axis.text.x = element_text(angle = 0)
+  )
 
 ```
 
@@ -676,7 +703,7 @@ df_liv |>
   scale_y_continuous(breaks = seq(0, 200, 20)) +
   facet_wrap(~ dut_id) +
   labs(
-    title = str_glue("{work_order} LI curves, 50C"),
+    title = str_glue("{work_order} burn in LI curves, 50C"),
     x = "Current (mA)",
     y = "Power (mW)"
   ) +
@@ -705,7 +732,7 @@ df_liv |>
   # scale_y_continuous(breaks = seq(0, 200, 20)) +
   facet_wrap(~ dut_id) +
   labs(
-    title = str_glue("{work_order} LI curves zoom, 50C"),
+    title = str_glue("{work_order} burn in LI curves zoom, 50C"),
     x = "Current (mA)",
     y = "Power (mW)"
   ) +
@@ -717,10 +744,43 @@ df_liv |>
 
 ```
 
+## VI curves
+
+```{r}
+#| label: vi-curves-burn
+#| fig-width: 8
+#| fig-height: 8
+
+df_liv |> 
+  group_by(dut_id, bi_status) |> 
+  filter(test_id == max(test_id)) |> 
+  ungroup() |> 
+  ggplot(aes(x = current/1e-3, y = voltage, color = bi_status)) +
+  geom_path() +
+  coord_cartesian(ylim = c(0, 4)) +
+  # scale_y_continuous(breaks = seq(0, 10, 0.5)) +
+  facet_wrap(~ dut_id) +
+  labs(
+    title = str_glue("{work_order} burn in VI curves, 50C"),
+    x = "Current (mA)",
+    y = "Voltage (V)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1), size = 6),
+    axis.text.x = element_text(angle = -90),
+    axis.text = element_text(size = 6)
+  )
+
+```
 
 ## Pass/Fail
 
 ```{r}
+#| label: tile-pf-post-bi
+#| fig-width: 8
+#| fig-height: 8
+
+
 # df_summary |> 
 #   filter(bi_status == "post") |> 
 #   select(fc_id, ch, pf_dIth1d, pf_dPf2) |> 
@@ -733,23 +793,23 @@ facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
           "dIth1d", "dPf2")
 
 
-df_summary |> 
-  select(fc_id, ch, dut_id, starts_with("pf_")) |> 
-  pivot_longer(
-    cols = starts_with("pf_"),
-    names_prefix = "pf_"
-  ) |> 
-  mutate(name = fct_relevel(name, facts)) |> 
-  ggplot(aes(x = name, y = ch, fill = value)) +
-  geom_tile(color = "black") +
-  scale_y_discrete(limits = rev) +
-  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-  facet_wrap(~ fc_id) +
-  theme(
-    axis.title = element_blank(),
-    axis.text.y = element_text(size = 6),
-    axis.text.x = element_text(angle = -90)
-  )
+# df_summary |> 
+#   select(fc_id, ch, dut_id, starts_with("pf_")) |> 
+#   pivot_longer(
+#     cols = starts_with("pf_"),
+#     names_prefix = "pf_"
+#   ) |> 
+#   mutate(name = fct_relevel(name, facts)) |> 
+#   ggplot(aes(x = name, y = ch, fill = value)) +
+#   geom_tile(color = "black") +
+#   scale_y_discrete(limits = rev) +
+#   scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
+#   facet_wrap(~ fc_id) +
+#   theme(
+#     axis.title = element_blank(),
+#     axis.text.y = element_text(size = 6),
+#     axis.text.x = element_text(angle = -90)
+#   )
 
 df_summary |> 
   filter(bi_status == "post") |> 
@@ -764,6 +824,9 @@ df_summary |>
   scale_y_discrete(limits = rev) +
   scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
   facet_wrap(~ name, nrow = 1) +
+  labs(
+    title = str_glue("{work_order} post burn in parametric summary")
+  )
   theme(
     axis.title = element_blank(),
     axis.text = element_text(size = 8),
