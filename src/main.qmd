@@ -389,6 +389,9 @@ df_summary |>
 ```{r}
 #| label: pf-tile-3
 
+facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
+          "dIth1d", "dPf2")
+
 df_summary |> 
   filter(bi_status == "pre") |> 
   select(fc_id, ch, dut_id, starts_with("pf_")) |> 
