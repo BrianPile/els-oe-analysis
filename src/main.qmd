@@ -30,6 +30,11 @@ source(here("src/local_data_wrangling.R"))
 # TODO: add MPD Ipd curves
 # TODO: add mpd Idark to df_summary AND pf_Idark to pf judgement
 
+
+# Notes:
+# post-bond (pre-burn) data screening is based on LIV test only, no spectral
+# post-burn data screening included LIV, OSA, and burn in results
+
 ```
 
 ```{r}
@@ -107,7 +112,7 @@ rm(filename_iv, filename_liv, filename_osa)
 #| label: data-filtering
 
 # If a measurement was run more than once, keep only the last one. The last one
-# should have the largest test_id increment.
+# corresponds to the largest test_id increment.
 
 # df_mpd_iv = df_mpd_iv |> 
 #   group_by(dut_id) |> 
@@ -152,7 +157,7 @@ df_summary_liv = df_liv |>
 
 
 #### OSA ####
-# TODO: add Pp, BW20dB ?
+# TODO: add Ppk, BW20dB ?
 
 df_summary_osa = df_osa |> 
   group_by(across(!c(wavelength, power))) |> 
@@ -192,13 +197,17 @@ df_summary = left_join(
 
 df_summary = df_summary |> 
   mutate(
-    pf_Ith    = if_else(Ith1d <=30,        TRUE, FALSE, NA),
+    pf_Ith    = if_else(Ith1d <= 30,       TRUE, FALSE, NA),
     pf_Vf_lo  = if_else(Vf2 >= 1.2,        TRUE, FALSE, NA),
     pf_Vf_hi  = if_else(Vf2 <= 2.0,        TRUE, FALSE, NA),
     pf_Pf     = if_else(Pf2 >= 80,         TRUE, FALSE, NA),
     pf_KINK   = if_else(abs(KINK) <= 30,   TRUE, FALSE, NA),
     pf_SMSR   = if_else(SMSR2 >= 35,       TRUE, FALSE, NA),
-    pf_specs  = if_all(pf_Ith:pf_SMSR)
+    pf_specs  = case_when(
+      bi_status == "pre" ~ if_all(pf_Ith:pf_KINK),
+      bi_status == "post" ~ if_all(pf_Ith:pf_SMSR),
+      .default = NA
+    )
   )
 
 ```
