@@ -15,3 +15,6 @@ local_config.R
 
 # ignore data directory
 data/
+
+# ignore doc directory
+doc/
