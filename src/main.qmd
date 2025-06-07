@@ -555,9 +555,6 @@ df_summary_test |>
 #| fig-height: 8
 
 df_liv |> 
-  group_by(dut_id) |> 
-  filter(test_id == max(test_id)) |> 
-  ungroup() |> 
   filter(bi_status == "pre") |> 
   ggplot(aes(x = current/1e-3, y = power/1e-3, color = ch)) +
   geom_path() +
@@ -585,9 +582,6 @@ df_liv |>
 #| fig-height: 8
 
 df_liv |> 
-  group_by(dut_id) |> 
-  filter(test_id == max(test_id)) |> 
-  ungroup() |> 
   filter(bi_status == "pre") |> 
   ggplot(aes(x = current/1e-3, y = voltage, color = ch)) +
   geom_path() +
