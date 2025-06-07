@@ -31,10 +31,9 @@ source(here("src/local_data_wrangling.R"))
 # 25FC01516-1
 
 # MISC
-# TODO: add mpd Idark to df_summary AND pf_Idark to pf judgement
 # TODO: wavelength spacing pass/fail - this is tough to do!!!
 # TODO: burn-in analysis: add CDFs for parameter changes
-# TODO: add pre burn-in yield and OE burn-in pick list
+# TODO: add pre burn-in yield and OE burn-in pick list, with Pareto
 # TODO: add post burn-in yield and OE final goods pick list
 
 # Notes:
@@ -75,6 +74,10 @@ df_mpd_iv = data.table::fread(file = here("data/processed", filename_iv)) |>
     ch = as.character(ch),
     dut_id = paste(sep = "-", fc_id, ch),
     .after = ch
+  ) |> 
+  mutate(
+    bi_status = factor(bi_status, levels = c("pre", "post")),
+    # bi_status = fct_relevel(bi_status, "pre", "post")
   )
 
 
@@ -107,7 +110,7 @@ df_osa = data.table::fread(file = here("data/processed", filename_osa)) |>
     dut_id = paste(sep = "-", fc_id, ch),
     ch = as.character(ch)
   ) |> 
-  mutate(bi_status = fct_relevel(bi_status, "pre", "post"))
+  mutate(bi_status = factor(bi_status, levels = c("pre", "post")))
 
 # cleanup some variables
 rm(filename_iv, filename_liv, filename_osa)
@@ -226,6 +229,38 @@ df_summary = df_summary |>
     )
   )
 
+# assign pass/fail codes
+df_summary_test = df_summary |> 
+  mutate(
+    pf_code =
+      case_when(
+        bi_status == "pre" ~ case_when(
+          pf_Vf_lo   == FALSE ~ "Vf_lo",
+          pf_Vf_hi   == FALSE ~ "Vf_hi",
+          pf_Pf   == FALSE ~ "Pf",
+          pf_Ith   == FALSE ~ "Ith",
+          # pf_SMSR3 == FALSE ~ "SMSR",
+          # pf_Lp3   == FALSE ~ "Lp",
+          pf_KINK  == FALSE ~ "kink",
+          pf_Idark == FALSE ~ "Idark",
+          pf_specs == TRUE ~ "PASS SPEC",
+          .default = "?"
+        ),
+        bi_status == "post" ~ case_when(
+          pf_Vf_lo   == FALSE ~ "Vf_lo",
+          pf_Vf_hi   == FALSE ~ "Vf_hi",
+          pf_Pf   == FALSE ~ "Pf",
+          pf_Ith   == FALSE ~ "Ith",
+          pf_SMSR == FALSE ~ "SMSR",
+          # pf_Lp3   == FALSE ~ "Lp",
+          pf_KINK  == FALSE ~ "kink",
+          # pf_Idark == FALSE ~ "Idark",
+          pf_specs == TRUE ~ "PASS SPEC",
+          .default = "?"
+        )
+      )
+  )
+
 ```
 
 ```{r}
@@ -278,6 +313,37 @@ df_summary = df_summary |>
 ```
 
 ```{r}
+#| label: yield-calculations
+
+df_spec_yield = df_summary |> 
+  # filter(bi_status == "pre") |> 
+  summarize(
+    .by = bi_status,
+    n = n(),
+    Ith_fail_count = sum(!pf_Ith),
+    Ith_yield_pct = 100 * (1 - Ith_fail_count/n),
+    Pf_fail_count = sum(!pf_Pf),
+    Pf_yield_pct = 100 * (1 - Pf_fail_count/n),
+    Vflo_fail_count = sum(!pf_Vf_lo),
+    Vflo_yield_pct = 100 * (1 - Vflo_fail_count/n),
+    Vfhi_fail_count = sum(!pf_Vf_hi),
+    Vfhi_yield_pct = 100 * (1 - Vfhi_fail_count/n),
+    KINK_fail_count = sum(!pf_KINK),
+    KINK_yield_pct = 100 * (1 - KINK_fail_count/n),
+    SMSR_fail_count = sum(!pf_SMSR),
+    SMSR_yield_pct = 100* (1 - SMSR_fail_count/n),
+    Idark_fail_count = sum(!pf_Idark),
+    Idark_yield_pct = 100 * (1 - Idark_fail_count/n),
+    total_fail_count = sum(!pf_specs),
+    total_yield_pct = 100 * (1 - total_fail_count/n)
+  )
+
+```
+
+
+
+
+```{r}
 #| label: output-summary-data
 
 df_summary |> 
@@ -327,7 +393,7 @@ df_stats_liv |>
   gt(rowname_col = "name") |> 
   tab_header(
     title = "Summary Statistics",
-    subtitle = paste0("N = ", df_liv$dut_id |> unique() |> length(), " devices")
+    subtitle = paste0("N = ", df_liv$dut_id |> unique() |> length(), " devices", ", Ths=50C")
   ) |> 
   tab_stubhead(label = "Parameter") |> 
   fmt_number(
@@ -337,13 +403,13 @@ df_stats_liv |>
     pattern = "Ith1d", replacement = "Threshold Current (mA)", locations = cells_stub()
   ) |> 
   text_replace(
-    pattern = "Pf3_cal", replacement = "Output Power (mW)", locations = cells_stub()
+    pattern = "Pf2", replacement = "Output Power (mW), 400mA", locations = cells_stub()
   ) |> 
   text_replace(
-    pattern = "Vf3", replacement = "Forward Voltage, (V)", locations = cells_stub()
+    pattern = "Vf2", replacement = "Forward Voltage, (V), 400mA", locations = cells_stub()
   ) |> 
   text_replace(
-    pattern = "SMSR3", replacement = "Side Mode Suppression Ratio (dB)", locations = cells_stub()
+    pattern = "SMSR3", replacement = "Side Mode Suppression Ratio (dB), 400mA", locations = cells_stub()
   ) |> 
   text_replace(
     pattern = "Lp3_cal", replacement = "Peak Wavelength (nm)", locations = cells_stub()
@@ -387,12 +453,84 @@ df_summary |>
   scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
   facet_wrap(~ name, nrow = 1) +
   labs(
-    title = str_glue("{work_order} pre burn-in parametric summary")
+    title = str_glue("{work_order} pre burn-in parametric pass/fail summary")
   ) +
   theme(
     axis.title = element_blank(),
     axis.text = element_text(size = 8),
     axis.text.x = element_text(angle = 0)
+  )
+
+```
+
+## Pass Rates
+
+```{r}
+
+# pass rates bar chart
+df_spec_yield |> 
+  filter(bi_status == "pre") |> 
+  select(-n) |> 
+  pivot_longer(!bi_status) |> 
+  filter(
+    str_detect(name, "yield"),
+    !str_detect(name, "SMSR")
+  ) |> 
+  mutate(
+    name = str_remove(name, "_yield_pct"),
+    name = fct_reorder(name, value, .desc = TRUE, .na_rm = TRUE)
+  ) |> 
+  ggplot(aes(x = name, y = value)) +
+  geom_col() +
+  geom_text(
+    aes(label = paste0(round(value, 0), "%")),
+    vjust = -0.5
+  ) +
+  coord_cartesian(ylim = c(NA, 110)) +
+  scale_y_continuous(breaks = seq(0, 200, 20)) +
+  labs(
+    title = "Pre burn-in criteria pass rates",
+    x = "Parameter",
+    y = "(%)"
+  )
+
+```
+
+## failure Pareto
+
+```{r}
+#| label: failure-pareto
+
+# failure Pareto
+df_summary_test |> 
+  filter(bi_status == "pre") |> 
+  summarize(
+    .by = c(bi_status, pf_code),
+    n = n()
+  ) |> 
+  mutate(
+    .by = c(bi_status),
+    pct = 100 * n/sum(n)
+  ) |> 
+  arrange(bi_status) |> 
+  mutate(
+    pf_code = fct_reorder(pf_code, pct, .desc = TRUE),
+    bar_color = if_else(pf_code == "PASS SPEC", "green", "red")
+  ) |> 
+  ggplot(aes(x = pf_code, y = pct, fill = bar_color)) +
+  geom_col(color = "black") +
+  geom_text(
+    aes(label = paste0(round(pct, 0), "%")),
+    vjust = -0.5
+  ) +
+  coord_cartesian(ylim = c(NA, 110)) +
+  scale_fill_identity() +
+  scale_x_discrete(drop = FALSE) +
+  scale_y_continuous(breaks = seq(0, 200, 20)) +
+  labs(
+    title = "Pre burn-in Pareto of first-failed criteria",
+    x = "Parameter",
+    y = "(%)"
   )
 
 ```
