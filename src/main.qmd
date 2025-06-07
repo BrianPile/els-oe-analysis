@@ -25,15 +25,15 @@ theme_set(theme_bw())
 source(here("local_config.R"))
 source(here("src/local_data_wrangling.R"))
 
-# TODO: burn in analysis
-# TODO: add pre burn in yield and OE burn in picklist
+# TODO: burn-in analysis
+# TODO: add pre burn-in yield and OE burn-in picklist
 # TODO: add MPD Ipd curves
 # TODO: add mpd Idark to df_summary AND pf_Idark to pf judgement
 
 
 # Notes:
 # post-bond (pre-burn) data screening is based on LIV test only, no spectral
-# post-burn data screening included LIV, OSA, and burn in results
+# post-burn data screening included LIV, OSA, and burn-in results
 
 ```
 
@@ -332,68 +332,7 @@ df_stats_liv |>
 ## Pass/Fail
 
 ```{r}
-#| label: pf-tile-1
-#| fig-width: 8
-#| fig-height: 10
-
-df_summary |> 
-  filter(bi_status == "pre") |> 
-  pivot_longer(
-    cols = c(starts_with("pf_")),
-    names_prefix = "pf_"
-  ) |> 
-  mutate(
-    name = fct_relevel(name, "Ith", "Vf_lo", "Vf_hi", "Pf", "KINK", "SMSR", "final"),
-    chunk_num = ntile(row_number(), 2)
-  ) |>
-  ggplot(aes(x = name, y = dut_id, fill = value)) +
-  geom_tile(color = "black", show.legend = FALSE) +
-  scale_y_discrete(limits=rev) +
-  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-  facet_wrap(~ chunk_num, scales = "free_y") +
-  labs(
-    title = str_glue("{work_order} Pass/Fail Tile")
-  ) +
-  theme(
-    axis.title = element_blank(),
-    axis.text.y = element_text(size = 7),
-    strip.text = element_blank()
-  )
-
-```
-
-
-```{r}
-#| label: pf-tile-2
-#| fig-width: 8
-#| fig-height: 8
-
-df_summary |> 
-  filter(bi_status == "pre") |> 
-  pivot_longer(
-    cols = c(starts_with("pf_")),
-    names_prefix = "pf_"
-  ) |> 
-  mutate(
-    name = fct_relevel(name, "Ith", "Vf_lo", "Vf_hi", "Pf", "KINK", "SMSR", "final"),
-  ) |>
-  ggplot(aes(x = name, y = ch, fill = value)) +
-  geom_tile(color = "black", show.legend = FALSE) +
-  scale_y_discrete(limits=rev) +
-  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-  # facet_wrap(~ chunk_num, scales = "free_y") +
-  facet_wrap(~ fc_id) +
-  theme(
-    axis.title = element_blank(),
-    axis.text.x = element_text(angle = -90),
-    # axis.text.y = element_text(size = 7)
-  )
-
-
-```
-
-```{r}
-#| label: pf-tile-3
+#| label: pf-tile
 
 facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
           "dIth1d", "dPf2")
@@ -442,6 +381,7 @@ df_liv |>
   filter(bi_status == "pre") |> 
   ggplot(aes(x = current/1e-3, y = power/1e-3, color = ch)) +
   geom_path() +
+  geom_hline(yintercept = 80) +
   coord_cartesian(ylim = c(0, 120)) +
   scale_y_continuous(breaks = seq(0, 200, 20)) +
   facet_wrap(~ fc_id) +
@@ -573,6 +513,7 @@ df_summary_osa |>
   geom_point() +
   geom_hline(yintercept = 35) +
   coord_cartesian(ylim = c(0, 70)) +
+  scale_y_continuous(breaks = seq(0, 100, 10)) +
   facet_wrap(~ fc_id) +
   labs(
     title = str_glue("{work_order} SMSR, 50C"),
