@@ -25,11 +25,14 @@ theme_set(theme_bw())
 source(here("local_config.R"))
 source(here("src/local_data_wrangling.R"))
 
-# TODO: burn-in analysis
-# TODO: add pre burn-in yield and OE burn-in picklist
+# TOP PRIORITY
+# TODO: problem in summary data. If_osa1 is sometimes 400 when it should always be 100???
+
+# TODO: burn-in analysis: add CDFs for parameter changes
+# TODO: add pre burn-in yield and OE burn-in pick list
+# TODO: add post burn-in yield and OE final goods pick list
 # TODO: add MPD Ipd curves
 # TODO: add mpd Idark to df_summary AND pf_Idark to pf judgement
-
 
 # Notes:
 # post-bond (pre-burn) data screening is based on LIV test only, no spectral
@@ -215,6 +218,8 @@ df_summary = df_summary |>
 ```{r}
 #| label: pf-judgement-burn
 
+# TODO: for pre burn in data, make all burn in pass/fail info NA
+
 df_summary = df_summary |> 
   mutate(
     .by = c(dut_id),
@@ -222,10 +227,28 @@ df_summary = df_summary |>
     dPf2_pct = 100 * (Pf2/first(Pf2, order_by = bi_status) - 1)
   ) |> 
   mutate(
-    pf_dIth1d = if_else(abs(dIth1d_pct) <= 10, TRUE, FALSE, FALSE),
-    pf_dPf2   = if_else(abs(dPf2_pct)   <= 10, TRUE, FALSE, FALSE),
+    # pf_dIth1d = if_else(abs(dIth1d_pct) <= 10, TRUE, FALSE, FALSE),
+    # pf_dPf2   = if_else(abs(dPf2_pct)   <= 10, TRUE, FALSE, FALSE),
+    
+    pf_dIth1d = case_when(
+      bi_status == "post" ~ if_else(abs(dIth1d_pct) <= 10, TRUE, FALSE, FALSE),
+      .default = NA
+    ),
+    
+    pf_dPf2 = case_when(
+      bi_status == "post" ~ if_else(abs(dPf2_pct)   <= 10, TRUE, FALSE, FALSE),
+      .default = NA
+    ),
+    
     pf_burn   = if_all(pf_dIth1d:pf_dPf2),
-    pf_final = pf_specs & pf_burn
+    # pf_final = pf_specs & pf_burn
+    
+    # pf_final = if_all(c(pf_specs, pf_burn))
+    
+    pf_final = case_when(
+      bi_status == "post" ~ pf_specs & pf_burn,
+      .default = NA
+    )
   )
 
 ```
@@ -351,7 +374,7 @@ df_summary |>
   scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
   facet_wrap(~ name, nrow = 1) +
   labs(
-    title = str_glue("{work_order} pre burn in parametric summary")
+    title = str_glue("{work_order} pre burn-in parametric summary")
   ) +
   theme(
     axis.title = element_blank(),
@@ -739,7 +762,7 @@ df_liv |>
 #   )
 
 facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
-          "dIth1d", "dPf2")
+          "dIth1d", "dPf2", "burn", "final")
 
 
 # df_summary |> 
