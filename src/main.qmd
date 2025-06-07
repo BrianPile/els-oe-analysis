@@ -244,6 +244,7 @@ df_summary_test = df_summary |>
           # pf_Lp3   == FALSE ~ "Lp",
           pf_KINK  == FALSE ~ "kink",
           pf_Idark == FALSE ~ "Idark",
+          pf_Ifmpd == FALSE ~ "Ifmpd",
           pf_specs == TRUE ~ "PASS SPEC",
           .default = "?"
         ),
@@ -256,6 +257,7 @@ df_summary_test = df_summary |>
           # pf_Lp3   == FALSE ~ "Lp",
           pf_KINK  == FALSE ~ "kink",
           # pf_Idark == FALSE ~ "Idark",
+          # pf_Ifmpd == FALSE ~ "Ifmpd",
           pf_specs == TRUE ~ "PASS SPEC",
           .default = "?"
         )
@@ -321,21 +323,23 @@ df_spec_yield = df_summary |>
   summarize(
     .by = bi_status,
     n = n(),
-    Ith_fail_count = sum(!pf_Ith),
+    Ith_fail_count = sum(!pf_Ith, na.rm = TRUE),
     Ith_yield_pct = 100 * (1 - Ith_fail_count/n),
-    Pf_fail_count = sum(!pf_Pf),
+    Pf_fail_count = sum(!pf_Pf, na.rm = TRUE),
     Pf_yield_pct = 100 * (1 - Pf_fail_count/n),
-    Vflo_fail_count = sum(!pf_Vf_lo),
+    Vflo_fail_count = sum(!pf_Vf_lo, na.rm = TRUE),
     Vflo_yield_pct = 100 * (1 - Vflo_fail_count/n),
-    Vfhi_fail_count = sum(!pf_Vf_hi),
+    Vfhi_fail_count = sum(!pf_Vf_hi, na.rm = TRUE),
     Vfhi_yield_pct = 100 * (1 - Vfhi_fail_count/n),
-    KINK_fail_count = sum(!pf_KINK),
+    KINK_fail_count = sum(!pf_KINK, na.rm = TRUE),
     KINK_yield_pct = 100 * (1 - KINK_fail_count/n),
-    SMSR_fail_count = sum(!pf_SMSR),
+    SMSR_fail_count = sum(!pf_SMSR, na.rm = TRUE),
     SMSR_yield_pct = 100* (1 - SMSR_fail_count/n),
-    Idark_fail_count = sum(!pf_Idark),
+    Idark_fail_count = sum(!pf_Idark, na.rm = TRUE),
     Idark_yield_pct = 100 * (1 - Idark_fail_count/n),
-    total_fail_count = sum(!pf_specs),
+    Ifmpd_fail_count = sum(!pf_Ifmpd, na.rm = TRUE),
+    Ifmpd_yield_pct = 100 * (1 - Ifmpd_fail_count/n),
+    total_fail_count = sum(!pf_specs, na.rm = TRUE),
     total_yield_pct = 100 * (1 - total_fail_count/n)
   )
 
@@ -479,7 +483,7 @@ df_spec_yield |>
   ) |> 
   mutate(
     name = str_remove(name, "_yield_pct"),
-    # name = fct_reorder(name, value, .desc = TRUE, .na_rm = TRUE)
+    name = fct_reorder(name, value, .desc = TRUE, .na_rm = TRUE)
   ) |> 
   ggplot(aes(x = name, y = value)) +
   geom_col() +
@@ -904,7 +908,7 @@ df_liv |>
 #| fig-width: 8
 #| fig-height: 8
 
-facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "specs",
+facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
           "dIth1d", "dPf2", "burn", "final")
 
 df_summary |> 
