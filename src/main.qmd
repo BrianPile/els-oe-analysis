@@ -31,12 +31,11 @@ source(here("src/local_data_wrangling.R"))
 # 25FC01516-1
 
 # MISC
+# TODO: add mpd Idark to df_summary AND pf_Idark to pf judgement
 # TODO: wavelength spacing pass/fail - this is tough to do!!!
 # TODO: burn-in analysis: add CDFs for parameter changes
 # TODO: add pre burn-in yield and OE burn-in pick list
 # TODO: add post burn-in yield and OE final goods pick list
-# TODO: add MPD Ipd curves
-# TODO: add mpd Idark to df_summary AND pf_Idark to pf judgement
 
 # Notes:
 # - post-bond (pre-burn) data screening is based on LIV test only, no spectral
@@ -147,7 +146,7 @@ df_summary_mpd = df_mpd_iv |>
   group_by(across(!c(voltage, current))) |> 
   summarize(
     Idark = extract_i_from_iv(voltage, current, V0 = -2),
-    If = extract_i_from_iv(voltage, current, V0 = 1),
+    If_mpd = extract_i_from_iv(voltage, current, V0 = 1),
     .groups = "drop"
   )
 
@@ -198,6 +197,14 @@ df_summary = left_join(
 ) |> 
   arrange(dut_id, bi_status)
 
+df_summary = left_join(
+  x = df_summary,
+  y = df_summary_mpd,
+  by = join_by(work_order, bi_status, fc_id, ch, dut_id, temperature),
+  suffix = c(".left", ".mpd")
+)
+
+# glimpse(df_summary)
 ```
 
 ```{r}
@@ -205,14 +212,15 @@ df_summary = left_join(
 
 df_summary = df_summary |> 
   mutate(
-    pf_Ith    = if_else(Ith1d <= 30,       TRUE, FALSE, NA),
-    pf_Vf_lo  = if_else(Vf2 >= 1.2,        TRUE, FALSE, NA),
-    pf_Vf_hi  = if_else(Vf2 <= 2.0,        TRUE, FALSE, NA),
-    pf_Pf     = if_else(Pf2 >= 80,         TRUE, FALSE, NA),
-    pf_KINK   = if_else(abs(KINK) <= 30,   TRUE, FALSE, NA),
-    pf_SMSR   = if_else(SMSR2 >= 35,       TRUE, FALSE, NA),
+    pf_Ith    = if_else(Ith1d <= 30,           TRUE, FALSE, NA),
+    pf_Vf_lo  = if_else(Vf2 >= 1.2,            TRUE, FALSE, NA),
+    pf_Vf_hi  = if_else(Vf2 <= 2.0,            TRUE, FALSE, NA),
+    pf_Pf     = if_else(Pf2 >= 80,             TRUE, FALSE, NA),
+    pf_KINK   = if_else(abs(KINK) <= 30,       TRUE, FALSE, NA),
+    pf_SMSR   = if_else(SMSR2 >= 35,           TRUE, FALSE, NA),
+    pf_Idark  = if_else(abs(Idark) <= 10e-9 ,  TRUE, FALSE, NA),
     pf_specs  = case_when(
-      bi_status == "pre" ~ if_all(pf_Ith:pf_KINK),
+      bi_status == "pre" ~ if_all(c(pf_Ith:pf_KINK, pf_Idark)),
       bi_status == "post" ~ if_all(pf_Ith:pf_SMSR),
       .default = NA
     )
@@ -362,7 +370,7 @@ df_stats_liv |>
 ```{r}
 #| label: pf-tile
 
-facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
+facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "specs",
           "dIth1d", "dPf2")
 
 df_summary |> 
@@ -757,36 +765,8 @@ df_liv |>
 #| fig-width: 8
 #| fig-height: 8
 
-
-# df_summary |> 
-#   filter(bi_status == "post") |> 
-#   select(fc_id, ch, pf_dIth1d, pf_dPf2) |> 
-#   pivot_wider(
-#     names_from = ch,
-#     values_from = c(pf_dIth1d, pf_dPf2)
-#   )
-
-facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
+facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "specs",
           "dIth1d", "dPf2", "burn", "final")
-
-
-# df_summary |> 
-#   select(fc_id, ch, dut_id, starts_with("pf_")) |> 
-#   pivot_longer(
-#     cols = starts_with("pf_"),
-#     names_prefix = "pf_"
-#   ) |> 
-#   mutate(name = fct_relevel(name, facts)) |> 
-#   ggplot(aes(x = name, y = ch, fill = value)) +
-#   geom_tile(color = "black") +
-#   scale_y_discrete(limits = rev) +
-#   scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-#   facet_wrap(~ fc_id) +
-#   theme(
-#     axis.title = element_blank(),
-#     axis.text.y = element_text(size = 6),
-#     axis.text.x = element_text(angle = -90)
-#   )
 
 df_summary |> 
   filter(bi_status == "post") |> 
