@@ -27,7 +27,11 @@ source(here("src/local_data_wrangling.R"))
 
 # TOP PRIORITY
 # TODO: problem in summary data. If_osa1 is sometimes 400 when it should always be 100???
+# 25FC01511-4
+# 25FC01516-1
 
+# MISC
+# TODO: wavelength spacing pass/fail - this is tough to do!!!
 # TODO: burn-in analysis: add CDFs for parameter changes
 # TODO: add pre burn-in yield and OE burn-in pick list
 # TODO: add post burn-in yield and OE final goods pick list
@@ -35,8 +39,8 @@ source(here("src/local_data_wrangling.R"))
 # TODO: add mpd Idark to df_summary AND pf_Idark to pf judgement
 
 # Notes:
-# post-bond (pre-burn) data screening is based on LIV test only, no spectral
-# post-burn data screening included LIV, OSA, and burn-in results
+# - post-bond (pre-burn) data screening is based on LIV test only, no spectral
+# - post-burn data screening included LIV, OSA, and burn-in results
 
 ```
 
@@ -128,7 +132,7 @@ df_liv = df_liv |>
   ungroup()
 
 df_osa = df_osa |> 
-  group_by(bi_status, dut_id) |> 
+  group_by(bi_status, dut_id, If) |> 
   filter(test_id == max(test_id)) |> 
   ungroup()
 
@@ -173,13 +177,14 @@ df_summary_osa = df_osa |>
 df_summary_osa_wide = df_summary_osa |> 
   rename(If_osa = If) |> 
   filter(If_osa %in% c(100e-3, 400e-3)) |> 
-  group_by(dut_id, test_id) |> 
+  # group_by(dut_id, test_id) |> 
+  group_by(dut_id) |> 
   mutate(If_index = seq_along(If_osa),
          If_osa = If_osa/1e-3) |> 
   ungroup() |> 
   pivot_wider(
     names_from = If_index,
-    values_from = c(If_osa, Lp, SMSR),
+    values_from = c(test_id, If_osa, Lp, SMSR),
     names_sep = ""
   ) |> 
   arrange(dut_id)
