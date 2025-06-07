@@ -31,6 +31,7 @@ source(here("src/local_data_wrangling.R"))
 # 25FC01516-1
 
 # MISC
+# TODO: add timestamp?
 # TODO: wavelength spacing pass/fail - this is tough to do!!!
 # TODO: burn-in analysis: add CDFs for parameter changes
 # TODO: add pre burn-in yield and OE burn-in pick list, with Pareto
