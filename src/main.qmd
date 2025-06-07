@@ -222,8 +222,9 @@ df_summary = df_summary |>
     pf_KINK   = if_else(abs(KINK) <= 30,       TRUE, FALSE, NA),
     pf_SMSR   = if_else(SMSR2 >= 35,           TRUE, FALSE, NA),
     pf_Idark  = if_else(abs(Idark) <= 10e-9 ,  TRUE, FALSE, NA),
+    pf_Ifmpd  = if_else(abs(If_mpd) >=1e-3,    TRUE, FALSE, NA),
     pf_specs  = case_when(
-      bi_status == "pre" ~ if_all(c(pf_Ith:pf_KINK, pf_Idark)),
+      bi_status == "pre" ~ if_all(c(pf_Ith:pf_KINK, pf_Idark, pf_Ifmpd)),
       bi_status == "post" ~ if_all(pf_Ith:pf_SMSR),
       .default = NA
     )
@@ -436,7 +437,7 @@ df_stats_liv |>
 ```{r}
 #| label: pf-tile
 
-facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "specs",
+facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
           "dIth1d", "dPf2")
 
 df_summary |> 
@@ -478,7 +479,7 @@ df_spec_yield |>
   ) |> 
   mutate(
     name = str_remove(name, "_yield_pct"),
-    name = fct_reorder(name, value, .desc = TRUE, .na_rm = TRUE)
+    # name = fct_reorder(name, value, .desc = TRUE, .na_rm = TRUE)
   ) |> 
   ggplot(aes(x = name, y = value)) +
   geom_col() +
