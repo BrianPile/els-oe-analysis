@@ -1,7 +1,7 @@
 # setup.R - Run this after cloning the repository
 
 # Create necessary directories for the project
-dirs = c("src", "doc", "data/raw", "data/processed", "data/output")
+dirs = c("src", "doc", "local_scripts", "data/raw", "data/processed", "data/output")
 
 for (dir in dirs) {
   if (!dir.exists(dir)) {
@@ -31,15 +31,15 @@ if (!file.exists(config_file)) {
 
 # Create local_data_wrangling.R if it doesn't exist. This will often need to be
 # customized for each work order.
-wrangle_file = "local_data_wrangling.R"
+combine_file = "local_combine_data_funcs.R"
 
-if (!file.exists(file.path("src", wrangle_file))) {
+if (!file.exists(file.path("src", combine_file))) {
   
   code_string =
 '# This is an auto-generated data wrangling script. Customize as needed!
 
 #### MPD IV ####
-wrangle_mpd = function(filename) {
+combine_mpd = function(filename) {
   iv_files = list.files(
     path = here("data/raw"),
     pattern = "^\\\\d{2}FC\\\\d{4,5}_CH\\\\d[.]csv$",
@@ -57,7 +57,7 @@ wrangle_mpd = function(filename) {
 }
 
 #### LIV ####
-wrangle_liv = function(filename) {
+combine_liv = function(filename) {
   liv_files = list.files(
     path = here("data/raw"),
     pattern = "_LIV[.]xlsx$|_LIV[.]csv$",
@@ -75,7 +75,7 @@ wrangle_liv = function(filename) {
 }
 
 #### OSA ####
-wrangle_osa = function(filename) {
+combine_osa = function(filename) {
   osa_files = list.files(
     path = here("data/raw"),
     pattern = "_OSA[.]xlsx$|_OSA[.]csv",
@@ -92,9 +92,9 @@ wrangle_osa = function(filename) {
   data.table::fwrite(df_osa, file = filename)
 }'
   
-  writeLines(code_string, "src/local_data_wrangling.R")
-  message("Created local_data_wrangling.R with default values.")
+  writeLines(code_string, "local_scripts/local_combine_data_funcs.R")
+  message("Created local_combine_data_funcs.R with default values.")
 
 } else {
-  message(paste(wrangle_file, "already exists."))
+  message(paste(combine_file, "already exists."))
 }

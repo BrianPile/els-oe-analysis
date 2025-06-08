@@ -23,7 +23,7 @@ library(devparext)
 library(loadr)
 theme_set(theme_bw())
 source(here("local_config.R"))
-source(here("src/local_data_wrangling.R"))
+# source(here("src/local_c.R"))
 
 # TOP PRIORITY
 # TODO: problem in summary data. If_osa1 is sometimes 400 when it should always be 100???
@@ -58,88 +58,13 @@ plot_cdf = function(data, group_var, value_var) {
 
 ```
 
-
 ```{r}
 #| label: load-processed-data
 
-#### MPD IV ####
-filename_iv = paste(work_order, "MPD IV combined data.csv")
-if (!file.exists(here("data/processed", filename_iv))) {
-  message("Wrangling MPD!!!")
-  wrangle_mpd(filename = here("data/processed", filename_iv))
-}
-
-df_mpd_iv = data.table::fread(file = here("data/processed", filename_iv)) |> 
-  as_tibble() |> 
-  mutate(
-    ch = as.character(ch),
-    dut_id = paste(sep = "-", fc_id, ch),
-    .after = ch
-  ) |> 
-  mutate(
-    bi_status = factor(bi_status, levels = c("pre", "post")),
-    # bi_status = fct_relevel(bi_status, "pre", "post")
-  )
-
-
-#### LIV ####
-filename_liv = paste(work_order, "LIV combined data.csv")
-if (!file.exists(here("data/processed", filename_liv))) {
-  message("Wrangling LIV!!!")
-  wrangle_liv(filename = here("data/processed", filename_liv))
-}
-
-df_liv = data.table::fread(file = here("data/processed", filename_liv)) |> 
-  as_tibble() |> 
-  mutate(
-    ch = as.character(ch),
-    dut_id = paste(sep = "-", fc_id, ch),
-    .after = ch
-  ) |> 
-  mutate(bi_status = fct_relevel(bi_status, "pre", "post"))
-
-#### OSA ####
-filename_osa = paste(work_order, "OSA combined data.csv")
-if (!file.exists(here("data/processed", filename_osa))) {
-  message("Wrangling OSA!!!")
-  wrangle_osa(filename = here("data/processed", filename_osa))
-}
-
-df_osa = data.table::fread(file = here("data/processed", filename_osa)) |> 
-  as_tibble() |> 
-  mutate(
-    dut_id = paste(sep = "-", fc_id, ch),
-    ch = as.character(ch)
-  ) |> 
-  mutate(bi_status = factor(bi_status, levels = c("pre", "post")))
-
-# cleanup some variables
-rm(filename_iv, filename_liv, filename_osa)
+source(here("src/load_combined_data.R"))
 
 ```
 
-```{r}
-#| label: data-filtering
-
-# If a measurement was run more than once, keep only the last one. The last one
-# corresponds to the largest test_id increment.
-
-# df_mpd_iv = df_mpd_iv |> 
-#   group_by(dut_id) |> 
-#   filter(test_id == max(test_id)) |> 
-#   ungroup()
-
-df_liv = df_liv |> 
-  group_by(bi_status, dut_id) |> 
-  filter(test_id == max(test_id)) |> 
-  ungroup()
-
-df_osa = df_osa |> 
-  group_by(bi_status, dut_id, If) |> 
-  filter(test_id == max(test_id)) |> 
-  ungroup()
-
-```
 
 ```{r}
 #| label: data-summarization
