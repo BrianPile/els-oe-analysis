@@ -23,6 +23,7 @@ library(devparext)
 library(loadr)
 theme_set(theme_bw())
 source(here("local_config.R"))
+source(here("src/summary_analysis_funcs.R"))
 # source(here("src/local_c.R"))
 
 # TOP PRIORITY
@@ -70,70 +71,11 @@ source(here("src/load_combined_data.R"))
 #| label: data-summarization
 #| message: false
 
-#### MPD ####
-df_summary_mpd = df_mpd_iv |> 
-  group_by(across(!c(voltage, current))) |> 
-  summarize(
-    Idark = extract_i_from_iv(voltage, current, V0 = -2),
-    If_mpd = extract_i_from_iv(voltage, current, V0 = 1),
-    .groups = "drop"
-  )
+df_summary_mpd = summarize_mpd_data(df_mpd_iv)
+df_summary_liv = summarize_liv_data(df_liv)
+df_summary_osa = summarize_osa_data(df_osa)
+df_summary = join_the_summaries(df_summary_liv, df_summary_osa, df_summary_mpd)
 
-
-#### LIV ####
-If_vec = c(100, 400)*1e-3
-Ix_vec = c(50)*1e-3
-Pop_vec = c(80)*1e-3
-df_summary_liv = df_liv |> 
-  group_by(across(!c(current, power, voltage, mpd_current))) |> 
-  summarize_raw_liv_data(If_vec, Ix_vec, Pop_vec, Ik1 = 250, Ik2 = 495) |> 
-  ungroup() |> 
-  mutate(across(matches("^Pf\\d$"), \(x) 10*log10(abs(x)), .names = "{.col}_dBm"), .after = Pf2)
-
-
-#### OSA ####
-# TODO: add Ppk, BW20dB ?
-
-df_summary_osa = df_osa |> 
-  group_by(across(!c(wavelength, power))) |> 
-  summarize(
-    Lp = extract_peak_wav(wavelength, power),
-    SMSR = extract_smsr(wavelength, power),
-    .groups = "drop"
-  )
-
-df_summary_osa_wide = df_summary_osa |> 
-  rename(If_osa = If) |> 
-  filter(If_osa %in% c(100e-3, 400e-3)) |> 
-  # group_by(dut_id, test_id) |> 
-  group_by(dut_id) |> 
-  mutate(If_index = seq_along(If_osa),
-         If_osa = If_osa/1e-3) |> 
-  ungroup() |> 
-  pivot_wider(
-    names_from = If_index,
-    values_from = c(test_id, If_osa, Lp, SMSR),
-    names_sep = ""
-  ) |> 
-  arrange(dut_id)
-
-#### SUMMARY ####
-df_summary = left_join(
-  x = df_summary_liv,
-  y = df_summary_osa_wide,
-  by = join_by(work_order, bi_status, fc_id, ch, dut_id, temperature),
-  suffix = c(".liv", ".osa")
-) |> 
-  arrange(dut_id, bi_status)
-
-df_summary = left_join(
-  x = df_summary,
-  y = df_summary_mpd,
-  by = join_by(work_order, bi_status, fc_id, ch, dut_id, temperature),
-  suffix = c(".left", ".mpd")
-)
-
-# glimpse(df_summary)
 ```
 
 ```{r}
