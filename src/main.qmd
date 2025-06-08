@@ -54,7 +54,9 @@ plot_cdf = function(data, group_var, value_var) {
     mutate(cdf = seq(1 / n(), 1, length.out = n())) |>
     ggplot(aes(x = {{ value_var }}, y = cdf, color = {{ group_var }})) +
     geom_line() +
-    geom_point()
+    geom_point() +
+    scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
+    ylab("Cumulative Probability")
 }
 
 ```
@@ -174,9 +176,9 @@ df_summary = df_summary |>
 ```
 
 ```{r}
-#| label: yield-calculation
+#| label: yield-calculations
 
-df_yield = df_summary |> 
+df_yield_channel = df_summary |> 
   summarize(
     .by = bi_status,
     n_total = n(),
@@ -194,6 +196,16 @@ df_yield = df_summary |>
     names_pattern = "pf_(.+)_(.*)"
   )
 
+df_yield_oe =   df_summary |> 
+    summarize(
+      .by = c(bi_status, fc_id),
+      pf_oe_spec = all(pf_specs),
+      pf_oe_burn = all(pf_burn)
+    ) |> 
+    mutate(
+      pf_oe_final = pf_oe_spec & pf_oe_burn
+    )
+    
 ```
 
 ```{r}
@@ -236,6 +248,25 @@ df_stats_liv = df_summary |>
 ```
 
 # Summary
+
+## OE-level yield
+
+```{r}
+df_yield_oe |> 
+  summarize(
+    .by = bi_status,
+    n_total = n(),
+    across(
+      .cols = starts_with("pf_"),
+      .fns = list(
+        fails = \(x) sum(!x),
+        yield = \(x) sum(x)/n()
+      )
+    )
+  )
+```
+
+
 
 ## Summary Stats
 
@@ -563,11 +594,9 @@ df_summary_osa |>
 df_summary_liv |> 
   filter(bi_status == "pre") |> 
   plot_cdf(group_var = ch, value_var = Ith1d) +
-  scale_y_continuous(labels = scales::label_percent()) +
   labs(
     title = str_glue("{work_order} Threshold Current CDF, 50C"),
-    x = "Ith1d (mA)",
-    y = "Cumulative Probability (%)"
+    x = "Ith1d (mA)"
   )
 
 ```
@@ -582,11 +611,9 @@ df_summary_liv |>
   plot_cdf(group_var = ch, value_var = Pf2) +
   geom_vline(xintercept = 80) +
   scale_x_continuous(breaks = seq(0, 200, 20)) +
-  scale_y_continuous(labels = scales::label_percent()) +
   labs(
     title = str_glue("{work_order} Output Power CDF, 400mA, 50C"),
-    x = "Pf400 (mW)",
-    y = "Cumulative Probability (%)"
+    x = "Pf400 (mW)"
   )
 
 ```
@@ -601,11 +628,9 @@ df_summary_liv |>
   plot_cdf(group_var = ch, value_var = Vf2) +
   geom_vline(xintercept = 2.0) +
   scale_x_continuous(breaks = seq(0, 10, 0.4)) +
-  scale_y_continuous(labels = scales::label_percent()) +
   labs(
     title = str_glue("{work_order} Foward Voltage CDF, 400mA, 50C"),
-    x = "Vf400 (V)",
-    y = "Cumulative Probability (%)"
+    x = "Vf400 (V)"
   )
 
 ```
@@ -622,11 +647,9 @@ df_summary_liv |>
   geom_vline(xintercept = c(30)) +
   coord_cartesian(xlim = c(0, NA)) +
   scale_x_continuous(breaks = seq(-1e3, 1e3, 20)) +
-  scale_y_continuous(labels = scales::label_percent()) +
   labs(
     title = str_glue("{work_order} Kink Deviation CDF, 250-495mA, 50C"),
-    x = "|Kink| (%)",
-    y = "Cumulative Probability (%)"
+    x = "|Kink| (%)"
   )
 
 ```
@@ -642,11 +665,9 @@ df_summary_osa |>
   geom_vline(xintercept = c(35)) +
   coord_cartesian(xlim = c(0, 70)) +
   scale_x_continuous(breaks = seq(0, 100, 10)) +
-  scale_y_continuous(labels = scales::label_percent()) +
   labs(
     title = str_glue("{work_order} SMSR CDF, 400mA, 50C"),
-    x = "SMSR (dB)",
-    y = "Cumulative Probability (%)"
+    x = "SMSR (dB)"
   )
 
 ```
@@ -657,12 +678,83 @@ df_summary_osa |>
 
 :::{.panel-tabset}
 
+## Pass/Fail
+
+```{r}
+#| label: tile-pf-post-bi
+#| fig-width: 8
+#| fig-height: 8
+
+facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
+          "dIth1d", "dPf2", "burn", "final")
+
+df_summary |> 
+  filter(bi_status == "post") |> 
+  select(fc_id, ch, dut_id, starts_with("pf_")) |> 
+  pivot_longer(
+    cols = starts_with("pf_"),
+    names_prefix = "pf_"
+  ) |> 
+  mutate(name = fct_relevel(name, facts)) |> 
+  ggplot(aes(x = ch, y = fc_id, fill = value)) +
+  geom_tile(color = "black", show.legend = FALSE) +
+  scale_y_discrete(limits = rev) +
+  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
+  facet_wrap(~ name, nrow = 1) +
+  labs(
+    title = str_glue("{work_order} post burn in parametric summary")
+  ) +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_text(size = 8),
+    axis.text.x = element_text(angle = 0)
+  )
+
+```
+
+
+## dIth CDF
+
+```{r}
+#| label: cdf-dIth
+
+df_summary |> 
+  filter(bi_status == "post") |> 
+  plot_cdf(group_var = ch, value_var = dIth1d_pct) +
+  geom_vline(xintercept = c(-10, 10)) +
+  scale_x_continuous(breaks = seq(-100, 100, 20)) +
+  labs(
+    title = "Burn-in ΔIth CDF, 50C",
+    x = "ΔIth (%)"
+  )
+  
+
+```
+
+## dPf CDF
+
+```{r}
+#| label: cdf-dIth
+
+df_summary |> 
+  filter(bi_status == "post") |> 
+  plot_cdf(group_var = ch, value_var = dPf2_pct) +
+  geom_vline(xintercept = c(-10, 10)) +
+  scale_x_continuous(breaks = seq(-100, 100, 20)) +
+  labs(
+    title = "Burn-in ΔPf CDF, 400mA, 50C",
+    x = "ΔIth (%)"
+  )
+
+```
+
+
 ## LI curves
 
 ```{r}
 #| label: li-curves-burn
-#| fig-width: 8
-#| fig-height: 8
+# fig-width: 8
+# fig-height: 8
 
 df_liv |> 
   group_by(dut_id, bi_status) |> 
@@ -744,38 +836,5 @@ df_liv |>
 
 ```
 
-## Pass/Fail
-
-```{r}
-#| label: tile-pf-post-bi
-#| fig-width: 8
-#| fig-height: 8
-
-facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
-          "dIth1d", "dPf2", "burn", "final")
-
-df_summary |> 
-  filter(bi_status == "post") |> 
-  select(fc_id, ch, dut_id, starts_with("pf_")) |> 
-  pivot_longer(
-    cols = starts_with("pf_"),
-    names_prefix = "pf_"
-  ) |> 
-  mutate(name = fct_relevel(name, facts)) |> 
-  ggplot(aes(x = ch, y = fc_id, fill = value)) +
-  geom_tile(color = "black", show.legend = FALSE) +
-  scale_y_discrete(limits = rev) +
-  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-  facet_wrap(~ name, nrow = 1) +
-  labs(
-    title = str_glue("{work_order} post burn in parametric summary")
-  ) +
-  theme(
-    axis.title = element_blank(),
-    axis.text = element_text(size = 8),
-    axis.text.x = element_text(angle = 0)
-  )
-
-```
 
 :::
