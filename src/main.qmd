@@ -203,7 +203,7 @@ df_yield_oe =   df_summary |>
       pf_oe_burn = all(pf_burn)
     ) |> 
     mutate(
-      pf_oe_final = pf_oe_spec & pf_oe_burn
+      pf_oe_final = if_else(bi_status == "post", pf_oe_spec & pf_oe_burn, NA)
     )
     
 ```
@@ -260,10 +260,28 @@ df_yield_oe |>
       .cols = starts_with("pf_"),
       .fns = list(
         fails = \(x) sum(!x),
+        passes = \(x) sum(x),
         yield = \(x) sum(x)/n()
       )
     )
-  )
+  ) |> 
+  pivot_longer(
+    cols = -c(bi_status, n_total),
+    names_to = c("test-level", ".value"),
+    names_pattern = "pf_oe_(.+)_(.+)"
+  ) |> 
+  mutate(yield = round(100*yield)) |> 
+  rename(
+    `burn-in status` = bi_status,
+    ss = n_total,
+    `fail count` = fails,
+    `pass count` = passes,
+    `yield (%)` = yield
+  ) |> 
+  drop_na() |> 
+  gt()
+
+
 ```
 
 
@@ -337,7 +355,7 @@ df_summary |>
   scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
   facet_wrap(~ name, nrow = 1) +
   labs(
-    title = str_glue("{work_order} pre burn-in parametric pass/fail summary")
+    title = str_glue("{work_order} pre burn-in parametric results")
   ) +
   theme(
     axis.title = element_blank(),
@@ -353,7 +371,7 @@ df_summary |>
 #| label: pass-rate-col-plot
 
 # pass rates bar chart
-df_yield |> 
+df_yield_channel |> 
   filter(
     bi_status == "pre",
     is.na(yield) == FALSE
@@ -389,27 +407,27 @@ df_summary |>
   ) |> 
   mutate(
     .by = c(bi_status),
-    pct = 100 * n/sum(n)
+    rate = n/sum(n)
   ) |> 
   arrange(bi_status) |> 
   mutate(
-    result_code = fct_reorder(result_code, pct, .desc = TRUE),
+    result_code = fct_reorder(result_code, rate, .desc = TRUE),
     bar_color = if_else(result_code == "PASS SPEC", "green", "red")
   ) |> 
-  ggplot(aes(x = result_code, y = pct, fill = bar_color)) +
+  ggplot(aes(x = result_code, y = rate, fill = bar_color)) +
   geom_col(color = "black") +
   geom_text(
-    aes(label = paste0(round(pct, 0), "%")),
+    aes(label = paste0(round(100*rate, 0), "%")),
     vjust = -0.5
   ) +
-  coord_cartesian(ylim = c(NA, 110)) +
+  coord_cartesian(ylim = c(NA, 1.05)) +
   scale_fill_identity() +
   scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(breaks = seq(0, 200, 20)) +
+  scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
   labs(
     title = "Pre burn-in Pareto of first-failed criteria",
     x = "Parameter",
-    y = "(%)"
+    y = NULL
   )
 
 ```
@@ -436,9 +454,12 @@ df_summary |>
 df_liv |> 
   filter(bi_status == "pre") |> 
   ggplot(aes(x = current/1e-3, y = power/1e-3, color = ch)) +
+  annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
+           fill = "gray90", color = "gray40", alpha = 0.5) +
   geom_path() +
-  geom_hline(yintercept = 80) +
-  coord_cartesian(ylim = c(0, 120)) +
+  # geom_hline(yintercept = 80, color = "gray") +
+  # geom_vline(xintercept = 400) +
+  coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
   scale_y_continuous(breaks = seq(0, 200, 20)) +
   facet_wrap(~ fc_id) +
   labs(
@@ -682,8 +703,8 @@ df_summary_osa |>
 
 ```{r}
 #| label: tile-pf-post-bi
-#| fig-width: 8
-#| fig-height: 8
+# fig-width: 8
+# fig-height: 8
 
 facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
           "dIth1d", "dPf2", "burn", "final")
@@ -702,7 +723,7 @@ df_summary |>
   scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
   facet_wrap(~ name, nrow = 1) +
   labs(
-    title = str_glue("{work_order} post burn in parametric summary")
+    title = str_glue("{work_order} post burn-in parametric results")
   ) +
   theme(
     axis.title = element_blank(),
@@ -734,7 +755,7 @@ df_summary |>
 ## dPf CDF
 
 ```{r}
-#| label: cdf-dIth
+#| label: cdf-dPf
 
 df_summary |> 
   filter(bi_status == "post") |> 
@@ -743,30 +764,31 @@ df_summary |>
   scale_x_continuous(breaks = seq(-100, 100, 20)) +
   labs(
     title = "Burn-in ΔPf CDF, 400mA, 50C",
-    x = "ΔIth (%)"
+    x = "ΔPf (%)"
   )
 
 ```
-
 
 ## LI curves
 
 ```{r}
 #| label: li-curves-burn
-# fig-width: 8
-# fig-height: 8
+#| fig-width: 8
+#| fig-height: 8
 
 df_liv |> 
   group_by(dut_id, bi_status) |> 
   filter(test_id == max(test_id)) |> 
   ungroup() |> 
   ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
+    annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
+           fill = "gray90", color = "gray") +
   geom_path() +
-  coord_cartesian(ylim = c(0, 120)) +
+  coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
   scale_y_continuous(breaks = seq(0, 200, 20)) +
   facet_wrap(~ dut_id) +
   labs(
-    title = str_glue("{work_order} burn in LI curves, 50C"),
+    title = str_glue("{work_order} burn-in LI curves, 50C"),
     x = "Current (mA)",
     y = "Power (mW)"
   ) +
