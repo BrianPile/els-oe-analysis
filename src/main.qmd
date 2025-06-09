@@ -263,7 +263,7 @@ df_stats_liv = df_summary |>
 
 # Summary
 
-## LD-level yield
+## yield
 
 ```{r}
 #| label: ld-level-yield-table
@@ -281,15 +281,15 @@ df_yield_channel |>
     `yield (%)` = yield
   ) |> 
   gt() |> 
-  tab_header(title = "LD-level Yield")
+  tab_header(title = str_glue("{work_order} LD-level Yield"))
 
 ```
 
 
-## OE-level yield
+
 
 ```{r}
-#| label: OE-level-yield
+#| label: OE-level-yield-table
 
 df_yield_oe |> 
   summarize(
@@ -328,7 +328,7 @@ df_yield_oe |>
 
 
 
-## Summary Stats
+## summary stats
 
 ```{r}
 #| label: table-stats
@@ -407,7 +407,7 @@ df_summary |>
 
 ```
 
-## Pass Rates
+## pass rates
 
 ```{r}
 #| label: pass-rate-col-plot
