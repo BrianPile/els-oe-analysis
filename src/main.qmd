@@ -97,14 +97,11 @@ df_summary = df_summary |>
     pf_Pf     = if_else(Pf2 >= 80,             TRUE, FALSE, NA),
     pf_KINK   = if_else(abs(KINK) <= 30,       TRUE, FALSE, NA),
     
-    # pf_SMSR   = if_else(SMSR2 >= 35,           TRUE, FALSE, NA),
-    
     pf_SMSR   = case_when(
       bi_status == "pre" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
       bi_status == "post" ~ if_else(SMSR2 >= 35, TRUE, FALSE, FALSE),
       .default = NULL
     ),
-    
     
     pf_Idark  = if_else(abs(Idark) <= 10e-9 ,  TRUE, FALSE, NA),
     pf_Ifmpd  = if_else(abs(If_mpd) >=1e-3,    TRUE, FALSE, NA),
