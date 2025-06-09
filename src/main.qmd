@@ -9,7 +9,7 @@ execute:
   echo: false
 embed-resources: true
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 ```{r}
@@ -279,7 +279,10 @@ df_yield_oe |>
     `yield (%)` = yield
   ) |> 
   drop_na() |> 
-  gt()
+  gt() |> 
+  tab_header(
+    title = str_glue("{work_order} OE-level Yield")
+  )
 
 
 ```
