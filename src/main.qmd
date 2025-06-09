@@ -199,6 +199,7 @@ df_yield_channel = df_summary |>
       .cols = starts_with("pf_"),
       .fns = list(
         fails = \(x) sum(!x),
+        passes = \(x) sum(x),
         yield = \(x) sum(x)/n()
       )
     )
@@ -262,9 +263,34 @@ df_stats_liv = df_summary |>
 
 # Summary
 
+## LD-level yield
+
+```{r}
+#| label: ld-level-yield-table
+
+df_yield_channel |> 
+  drop_na() |> 
+  filter(parameter %in% c("specs", "burn", "final")) |> 
+  mutate(yield = round(100*yield)) |> 
+  rename(
+    `burn-in status` = bi_status,
+    ss = n_total,
+    `test-level` = parameter,
+    `fail count` = fails,
+    `pass count` = passes,
+    `yield (%)` = yield
+  ) |> 
+  gt() |> 
+  tab_header(title = "LD-level Yield")
+
+```
+
+
 ## OE-level yield
 
 ```{r}
+#| label: OE-level-yield
+
 df_yield_oe |> 
   summarize(
     .by = bi_status,
@@ -443,7 +469,11 @@ df_summary |>
   labs(
     title = "Pre burn-in Pareto of first-failed criteria",
     x = "Parameter",
-    y = NULL
+    y = NULL,
+    caption = "Note: result depends on the order in which the parameters are checked"
+  ) +
+  theme(
+    plot.caption = element_text(hjust = 0)
   )
 
 ```
