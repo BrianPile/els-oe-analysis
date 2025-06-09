@@ -442,28 +442,54 @@ df_summary |>
 ## pass rates
 
 ```{r}
-#| label: pass-rate-col-plot
+#| label: pass-rate-col-plots
 
-# pass rates bar chart
-df_yield_channel |> 
-  filter(
-    bi_status == "pre",
-    is.na(yield) == FALSE
-  ) |> 
-  mutate(parameter = fct_reorder(parameter, yield, .desc = TRUE)) |> 
-  ggplot(aes(x = parameter, y = yield)) +
-  geom_col() +
-  geom_text(
-    aes(label = paste0(round(100*yield, 0), "%")),
-    vjust = -0.5
-  ) +
-  coord_cartesian(ylim = c(NA, 1.05)) +
-  scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
-  labs(
-    title = "Pre burn-in criteria pass rates",
-    x = "Parameter",
-    y = NULL
-  )
+# # pass rates bar chart
+# df_yield_channel |> 
+#   filter(
+#     bi_status == "pre",
+#     is.na(yield) == FALSE
+#   ) |> 
+#   mutate(parameter = fct_reorder(parameter, yield, .desc = TRUE)) |> 
+#   ggplot(aes(x = parameter, y = yield)) +
+#   geom_col() +
+#   geom_text(
+#     aes(label = paste0(round(100*yield, 0), "%")),
+#     vjust = -0.5
+#   ) +
+#   coord_cartesian(ylim = c(NA, 1.05)) +
+#   scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
+#   labs(
+#     title = "Pre burn-in criteria pass rates",
+#     x = "Parameter",
+#     y = NULL
+#   )
+
+for (status in c("pre", "post")) { 
+  
+  # pass rates bar chart
+  p = df_yield_channel |> 
+    filter(
+      bi_status == status,
+      is.na(yield) == FALSE
+    ) |> 
+    mutate(parameter = fct_reorder(parameter, yield, .desc = TRUE)) |> 
+    ggplot(aes(x = parameter, y = yield)) +
+    geom_col() +
+    geom_text(
+      aes(label = paste0(round(100*yield, 0), "%")),
+      vjust = -0.5
+    ) +
+    coord_cartesian(ylim = c(NA, 1.05)) +
+    scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
+    # facet_wrap(~ bi_status, scales = "free_x") +
+    labs(
+      title = str_glue("{work_order} {status} burn-in criteria pass rates"),
+      x = "Parameter",
+      y = NULL
+    )
+  print(p)
+}
 
 ```
 
