@@ -375,10 +375,10 @@ df_stats_liv |>
 
 ```
 
-## pre burn-in parametric results
+## parametric results
 
 ```{r}
-#| label: pf-tile
+#| label: pre-burn-parametric-results
 
 facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
           "dIth1d", "dPf2")
@@ -398,6 +398,38 @@ df_summary |>
   facet_wrap(~ name, nrow = 1) +
   labs(
     title = str_glue("{work_order} pre burn-in parametric results")
+  ) +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_text(size = 8),
+    axis.text.x = element_text(angle = 0)
+  )
+
+```
+
+```{r}
+#| label: post-burn-parametric-results
+# fig-width: 8
+# fig-height: 8
+
+facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
+          "dIth1d", "dPf2", "burn", "final")
+
+df_summary |> 
+  filter(bi_status == "post") |> 
+  select(fc_id, ch, dut_id, starts_with("pf_")) |> 
+  pivot_longer(
+    cols = starts_with("pf_"),
+    names_prefix = "pf_"
+  ) |> 
+  mutate(name = fct_relevel(name, facts)) |> 
+  ggplot(aes(x = ch, y = fc_id, fill = value)) +
+  geom_tile(color = "black", show.legend = FALSE) +
+  scale_y_discrete(limits = rev) +
+  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
+  facet_wrap(~ name, nrow = 1) +
+  labs(
+    title = str_glue("{work_order} post burn-in parametric results")
   ) +
   theme(
     axis.title = element_blank(),
@@ -745,39 +777,7 @@ df_summary_osa |>
 
 :::{.panel-tabset}
 
-## post burn-in parameteric results
 
-```{r}
-#| label: tile-pf-post-bi
-# fig-width: 8
-# fig-height: 8
-
-facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
-          "dIth1d", "dPf2", "burn", "final")
-
-df_summary |> 
-  filter(bi_status == "post") |> 
-  select(fc_id, ch, dut_id, starts_with("pf_")) |> 
-  pivot_longer(
-    cols = starts_with("pf_"),
-    names_prefix = "pf_"
-  ) |> 
-  mutate(name = fct_relevel(name, facts)) |> 
-  ggplot(aes(x = ch, y = fc_id, fill = value)) +
-  geom_tile(color = "black", show.legend = FALSE) +
-  scale_y_discrete(limits = rev) +
-  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-  facet_wrap(~ name, nrow = 1) +
-  labs(
-    title = str_glue("{work_order} post burn-in parametric results")
-  ) +
-  theme(
-    axis.title = element_blank(),
-    axis.text = element_text(size = 8),
-    axis.text.x = element_text(angle = 0)
-  )
-
-```
 
 
 ## dIth CDF
@@ -835,7 +835,7 @@ df_liv |>
   ) |> 
   ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
     annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
-           fill = "gray90", color = "gray") +
+           fill = "gray90", color = "gray", alpha = 0.5) +
   geom_path() +
   coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
   scale_y_continuous(breaks = seq(0, 200, 20)) +
