@@ -9,7 +9,7 @@ execute:
   echo: false
 embed-resources: true
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 ```{r}
@@ -176,7 +176,7 @@ df_summary = df_summary |>
 ```
 
 ```{r}
-#| label: yield-calculations
+#| label: yield-calculation
 
 df_yield_channel = df_summary |> 
   summarize(
