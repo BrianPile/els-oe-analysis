@@ -91,7 +91,16 @@ df_summary = df_summary |>
     pf_Vf_hi  = if_else(Vf2 <= 2.0,            TRUE, FALSE, NA),
     pf_Pf     = if_else(Pf2 >= 80,             TRUE, FALSE, NA),
     pf_KINK   = if_else(abs(KINK) <= 30,       TRUE, FALSE, NA),
-    pf_SMSR   = if_else(SMSR2 >= 35,           TRUE, FALSE, NA),
+    
+    # pf_SMSR   = if_else(SMSR2 >= 35,           TRUE, FALSE, NA),
+    
+    pf_SMSR   = case_when(
+      bi_status == "pre" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
+      bi_status == "post" ~ if_else(SMSR2 >= 35, TRUE, FALSE, FALSE),
+      .default = NULL
+    ),
+    
+    
     pf_Idark  = if_else(abs(Idark) <= 10e-9 ,  TRUE, FALSE, NA),
     pf_Ifmpd  = if_else(abs(If_mpd) >=1e-3,    TRUE, FALSE, NA),
     pf_specs  = case_when(
@@ -139,8 +148,6 @@ df_summary = df_summary |>
 
 ```{r}
 #| label: pf-judgement-burn
-
-# TODO: for pre burn-in data, make all burn-in pass/fail info NA
 
 df_summary = df_summary |> 
   mutate(
@@ -336,7 +343,7 @@ df_stats_liv |>
 
 ```
 
-## Pass/Fail summary
+## pre burn-in parametric results
 
 ```{r}
 #| label: pf-tile
@@ -702,7 +709,7 @@ df_summary_osa |>
 
 :::{.panel-tabset}
 
-## Pass/Fail
+## post burn-in parameteric results
 
 ```{r}
 #| label: tile-pf-post-bi
