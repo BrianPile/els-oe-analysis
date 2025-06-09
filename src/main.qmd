@@ -746,6 +746,7 @@ df_summary |>
   filter(bi_status == "post") |> 
   plot_cdf(group_var = ch, value_var = dIth1d_pct) +
   geom_vline(xintercept = c(-10, 10)) +
+  coord_cartesian(xlim = c(-40, 40)) +
   scale_x_continuous(breaks = seq(-100, 100, 20)) +
   labs(
     title = "Burn-in ΔIth CDF, 50C",
@@ -856,14 +857,14 @@ df_liv |>
     y = "Power (mW)"
   ) +
   theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 6),
+    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
     axis.text.x = element_text(angle = -90),
     axis.text = element_text(size = 6)
   )
 
 ```
 
-## LI curves zoom
+## LI curves zoom failures
 
 ```{r}
 #| label: li-curves-burn-zoom-failures
