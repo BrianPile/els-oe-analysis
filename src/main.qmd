@@ -777,9 +777,6 @@ df_summary |>
 #| fig-height: 8
 
 df_liv |> 
-  group_by(dut_id, bi_status) |> 
-  filter(test_id == max(test_id)) |> 
-  ungroup() |> 
   ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
     annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
            fill = "gray90", color = "gray") +
@@ -808,9 +805,6 @@ df_liv |>
 #| fig-height: 8
 
 df_liv |> 
-  group_by(dut_id, bi_status) |> 
-  filter(test_id == max(test_id)) |> 
-  ungroup() |> 
   ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
   geom_path() +
   coord_cartesian(xlim = c(8, 30), ylim = c(0, 6)) +
@@ -818,6 +812,34 @@ df_liv |>
   facet_wrap(~ dut_id) +
   labs(
     title = str_glue("{work_order} burn in LI curves zoom, 50C"),
+    x = "Current (mA)",
+    y = "Power (mW)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1), size = 6),
+    axis.text.x = element_text(angle = -90),
+    axis.text = element_text(size = 6)
+  )
+
+```
+
+## LI curves failures
+
+```{r}
+#| label: li-curves-burn-failures
+#| fig-width: 8
+#| fig-height: 8
+
+df_liv |> 
+  ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
+    annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
+           fill = "gray90", color = "gray") +
+  geom_path() +
+  coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
+  scale_y_continuous(breaks = seq(0, 200, 20)) +
+  facet_wrap(~ dut_id) +
+  labs(
+    title = str_glue("{work_order} burn-in LI curves, 50C"),
     x = "Current (mA)",
     y = "Power (mW)"
   ) +
