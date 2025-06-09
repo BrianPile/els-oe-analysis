@@ -38,7 +38,6 @@ source(here("src/summary_analysis_funcs.R"))
 # TODO: create a render_quarto.R script to control the output html file location and name
 # TODO: add timestamp?
 # TODO: wavelength spacing pass/fail - this is tough to do!!!
-# TODO: burn-in analysis: add CDFs for parameter changes
 # TODO: add pre burn-in yield and OE burn-in pick list, with Pareto
 # TODO: add post burn-in yield and OE final goods pick list
 
