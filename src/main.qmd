@@ -49,13 +49,15 @@ source(here("src/summary_analysis_funcs.R"))
 
 plot_cdf = function(data, group_var, value_var) {
   data |>
-    group_by({{ group_var }}) |>
-    arrange({{ group_var }}, {{ value_var }}) |>
+    filter(is.na({{ value_var }}) == FALSE) |> 
+    group_by(bi_status, {{ group_var }}) |>
+    arrange({{ value_var }}) |>
     mutate(cdf = seq(1 / n(), 1, length.out = n())) |>
     ggplot(aes(x = {{ value_var }}, y = cdf, color = {{ group_var }})) +
     geom_line() +
     geom_point() +
     scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
+    facet_wrap(~ bi_status) +
     ylab("Cumulative Probability")
 }
 
@@ -462,7 +464,7 @@ df_summary |>
 #| fig-height: 8
 
 df_liv |> 
-  filter(bi_status == "pre") |> 
+  # filter(bi_status == "pre") |> 
   ggplot(aes(x = current/1e-3, y = power/1e-3, color = ch)) +
   annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
            fill = "gray90", color = "gray40", alpha = 0.5) +
@@ -471,7 +473,7 @@ df_liv |>
   # geom_vline(xintercept = 400) +
   coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
   scale_y_continuous(breaks = seq(0, 200, 20)) +
-  facet_wrap(~ fc_id) +
+  facet_wrap(fc_id ~ bi_status) +
   labs(
     title = str_glue("{work_order} LI curves, 50C"),
     x = "Current (mA)",
@@ -492,12 +494,12 @@ df_liv |>
 #| fig-height: 8
 
 df_liv |> 
-  filter(bi_status == "pre") |> 
+  # filter(bi_status == "pre") |> 
   ggplot(aes(x = current/1e-3, y = voltage, color = ch)) +
   geom_path() +
   coord_cartesian(ylim = c(0, 2)) +
   scale_y_continuous(breaks = seq(0, 3, 0.4)) +
-  facet_wrap(~ fc_id) +
+  facet_wrap(fc_id ~ bi_status) +
   labs(
     title = str_glue("{work_order} VI curves, 50C"),
     x = "Current (mA)",
@@ -522,7 +524,7 @@ df_mpd_iv |>
   geom_line() +
   coord_cartesian(ylim = c(-12, -2)) +
   scale_y_continuous(breaks = seq(-12, 0, 3)) +
-  facet_wrap( ~ fc_id) +
+  facet_wrap(fc_id ~ bi_status) +
   labs(
     title = str_glue("{work_order} MPD IV curves, 50C"),
     x = "Voltage (V)",
@@ -547,7 +549,7 @@ df_osa |>
   ggplot(aes(x = wavelength, y = power, color = ch)) +
   geom_path() +
   coord_cartesian(ylim = c(-80, 20)) +
-  facet_wrap(~ fc_id) +
+  facet_wrap(fc_id ~ bi_status) +
   labs(
     title = str_glue("{work_order} Spectra, 400mA, 50C"),
     x = "Wavelength (nm)",
@@ -558,7 +560,6 @@ df_osa |>
   )
 
 ```
-
 
 ### Peak WL
 
@@ -571,7 +572,7 @@ df_summary_osa |>
   ggplot(aes(x = If/1e-3, y = Lp, color = ch)) +
   geom_line() +
   geom_point() +
-  facet_wrap(~ fc_id) +
+  facet_wrap(fc_id ~ bi_status) +
   labs(
     title = str_glue("{work_order} Peak WL, 50C"),
     x = "Current (mA)",
@@ -598,7 +599,7 @@ df_summary_osa |>
   geom_hline(yintercept = 35) +
   coord_cartesian(ylim = c(0, 70)) +
   scale_y_continuous(breaks = seq(0, 100, 10)) +
-  facet_wrap(~ fc_id) +
+  facet_wrap(fc_id ~ bi_status) +
   labs(
     title = str_glue("{work_order} SMSR, 50C"),
     x = "Current (mA)",
@@ -623,12 +624,13 @@ df_summary_osa |>
 #| label: cdf-ith
 
 df_summary_liv |> 
-  filter(bi_status == "pre") |> 
+  # filter(bi_status == "pre") |> 
   plot_cdf(group_var = ch, value_var = Ith1d) +
   labs(
     title = str_glue("{work_order} Threshold Current CDF, 50C"),
     x = "Ith1d (mA)"
-  )
+  ) +
+  coord_cartesian(xlim = c(0, 30), ylim = c(0, 1))
 
 ```
 
@@ -638,7 +640,7 @@ df_summary_liv |>
 #| label: cdf-pf400
 
 df_summary_liv |> 
-  filter(bi_status == "pre") |> 
+  # filter(bi_status == "pre") |> 
   plot_cdf(group_var = ch, value_var = Pf2) +
   geom_vline(xintercept = 80) +
   scale_x_continuous(breaks = seq(0, 200, 20)) +
@@ -655,7 +657,7 @@ df_summary_liv |>
 #| label: cdf-vf400
 
 df_summary_liv |> 
-  filter(bi_status == "pre") |> 
+  # filter(bi_status == "pre") |> 
   plot_cdf(group_var = ch, value_var = Vf2) +
   geom_vline(xintercept = 2.0) +
   scale_x_continuous(breaks = seq(0, 10, 0.4)) +
@@ -672,11 +674,11 @@ df_summary_liv |>
 #| label: cdf-kink
 
 df_summary_liv |> 
-  filter(bi_status == "pre") |> 
+  # filter(bi_status == "pre") |> 
   mutate(KINK = abs(KINK)) |> 
   plot_cdf(group_var = ch, value_var = KINK) +
   geom_vline(xintercept = c(30)) +
-  coord_cartesian(xlim = c(0, NA)) +
+  coord_cartesian(xlim = c(0, 100)) +
   scale_x_continuous(breaks = seq(-1e3, 1e3, 20)) +
   labs(
     title = str_glue("{work_order} Kink Deviation CDF, 250-495mA, 50C"),

@@ -19,9 +19,13 @@ summarize_liv_data = function(data) {
   If_vec = c(100, 400)*1e-3
   Ix_vec = c(50)*1e-3
   Pop_vec = c(80)*1e-3
+  n1_smooth = 3
+  n2_smooth = 3
+  n3_smooth = 1
   df_summary_liv = data |> 
     group_by(across(!c(current, power, voltage, mpd_current))) |> 
-    summarize_raw_liv_data(If_vec, Ix_vec, Pop_vec, Ik1 = 250, Ik2 = 495) |> 
+    summarize_raw_liv_data(If_vec, Ix_vec, Pop_vec, Ik1 = 250, Ik2 = 495,
+                           n1_smooth = n1_smooth, n2_smooth = n2_smooth) |> 
     ungroup() |> 
     mutate(across(matches("^Pf\\d$"), \(x) 10*log10(abs(x)), .names = "{.col}_dBm"), .after = Pf2)
   return(df_summary_liv)
