@@ -16,6 +16,7 @@ editor_options:
 #| label: setup
 #| message: false
 
+library(quarto)
 suppressPackageStartupMessages(library(tidyverse))
 library(gt)
 library(here)
@@ -24,7 +25,9 @@ library(loadr)
 theme_set(theme_bw())
 source(here("local_config.R"))
 source(here("src/summary_analysis_funcs.R"))
-# source(here("src/local_c.R"))
+
+
+
 
 # TOP PRIORITY
 # TODO: problem in summary data. If_osa1 is sometimes 400 when it should always be 100???
@@ -32,6 +35,7 @@ source(here("src/summary_analysis_funcs.R"))
 # 25FC01516-1
 
 # MISC
+# TODO: create a render_quarto.R script to control the output html file location and name
 # TODO: add timestamp?
 # TODO: wavelength spacing pass/fail - this is tough to do!!!
 # TODO: burn-in analysis: add CDFs for parameter changes
@@ -847,7 +851,7 @@ df_liv |>
     y = "Power (mW)"
   ) +
   theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 6),
+    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
     axis.text.x = element_text(angle = -90),
     axis.text = element_text(size = 6)
   )
@@ -862,9 +866,15 @@ df_liv |>
 #| fig-height: 8
 
 df_liv |> 
-  group_by(dut_id, bi_status) |> 
-  filter(test_id == max(test_id)) |> 
-  ungroup() |> 
+  filter(
+    dut_id %in% (
+      df_summary |> 
+        filter(
+          pf_burn == FALSE
+        ) |> 
+        pull(dut_id)
+    )
+  ) |> 
   ggplot(aes(x = current/1e-3, y = voltage, color = bi_status)) +
   geom_path() +
   coord_cartesian(ylim = c(0, 4)) +
@@ -876,7 +886,7 @@ df_liv |>
     y = "Voltage (V)"
   ) +
   theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 6),
+    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
     axis.text.x = element_text(angle = -90),
     axis.text = element_text(size = 6)
   )
