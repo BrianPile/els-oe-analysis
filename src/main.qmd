@@ -115,8 +115,6 @@ df_summary = df_summary |>
     )
   )
 
-
-
 ```
 
 ```{r}
