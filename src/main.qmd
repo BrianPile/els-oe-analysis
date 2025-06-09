@@ -737,6 +737,113 @@ df_summary_osa |>
 
 ```
 
+### LI curves failures
+
+```{r}
+#| label: li-curves-burn-failures
+#| fig-width: 8
+#| fig-height: 8
+
+df_liv |> 
+  filter(
+    dut_id %in% (
+      df_summary |> 
+        filter(
+          pf_burn == FALSE
+        ) |> 
+        pull(dut_id)
+    )
+  ) |> 
+  ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
+    annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
+           fill = "gray90", color = "gray", alpha = 0.5) +
+  geom_path() +
+  coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
+  scale_y_continuous(breaks = seq(0, 200, 20)) +
+  facet_wrap(~ dut_id) +
+  labs(
+    title = str_glue("{work_order} burn-in failures LI curves, 50C"),
+    x = "Current (mA)",
+    y = "Power (mW)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
+    axis.text.x = element_text(angle = -90),
+    axis.text = element_text(size = 6)
+  )
+
+```
+
+### LI curves zoom failures
+
+```{r}
+#| label: li-curves-burn-zoom-failures
+#| fig-width: 8
+#| fig-height: 8
+
+df_liv |> 
+  filter(
+    dut_id %in% (
+      df_summary |> 
+        filter(
+          pf_burn == FALSE
+        ) |> 
+        pull(dut_id)
+    )
+  ) |> 
+  ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
+  geom_path() +
+  coord_cartesian(xlim = c(8, 30), ylim = c(0, 6)) +
+  # scale_y_continuous(breaks = seq(0, 200, 20)) +
+  facet_wrap(~ dut_id) +
+  labs(
+    title = str_glue("{work_order} burn-in failures LI curves zoom, 50C"),
+    x = "Current (mA)",
+    y = "Power (mW)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
+    axis.text.x = element_text(angle = -90),
+    axis.text = element_text(size = 6)
+  )
+
+```
+
+### VI curves failures
+
+```{r}
+#| label: vi-curves-burn
+#| fig-width: 8
+#| fig-height: 8
+
+df_liv |> 
+  filter(
+    dut_id %in% (
+      df_summary |> 
+        filter(
+          pf_burn == FALSE
+        ) |> 
+        pull(dut_id)
+    )
+  ) |> 
+  ggplot(aes(x = current/1e-3, y = voltage, color = bi_status)) +
+  geom_path() +
+  coord_cartesian(ylim = c(0, 4)) +
+  # scale_y_continuous(breaks = seq(0, 10, 0.5)) +
+  facet_wrap(~ dut_id) +
+  labs(
+    title = str_glue("{work_order} burn-in VI curves, 50C"),
+    x = "Current (mA)",
+    y = "Voltage (V)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
+    axis.text.x = element_text(angle = -90),
+    axis.text = element_text(size = 6)
+  )
+
+```
+
 :::
 
 ## Parametric Data
@@ -830,16 +937,7 @@ df_summary_osa |>
 
 ```
 
-:::
-
-# burn-in
-
-:::{.panel-tabset}
-
-
-
-
-## dIth CDF
+### dIth CDF
 
 ```{r}
 #| label: cdf-dIth
@@ -858,7 +956,7 @@ df_summary |>
 
 ```
 
-## dPf CDF
+### dPf CDF
 
 ```{r}
 #| label: cdf-dPf
@@ -875,112 +973,6 @@ df_summary |>
 
 ```
 
-## LI curves failures
-
-```{r}
-#| label: li-curves-burn-failures
-#| fig-width: 8
-#| fig-height: 8
-
-df_liv |> 
-  filter(
-    dut_id %in% (
-      df_summary |> 
-        filter(
-          pf_burn == FALSE
-        ) |> 
-        pull(dut_id)
-    )
-  ) |> 
-  ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
-    annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
-           fill = "gray90", color = "gray", alpha = 0.5) +
-  geom_path() +
-  coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
-  scale_y_continuous(breaks = seq(0, 200, 20)) +
-  facet_wrap(~ dut_id) +
-  labs(
-    title = str_glue("{work_order} burn-in failures LI curves, 50C"),
-    x = "Current (mA)",
-    y = "Power (mW)"
-  ) +
-  theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
-    axis.text.x = element_text(angle = -90),
-    axis.text = element_text(size = 6)
-  )
-
-```
-
-## LI curves zoom failures
-
-```{r}
-#| label: li-curves-burn-zoom-failures
-#| fig-width: 8
-#| fig-height: 8
-
-df_liv |> 
-  filter(
-    dut_id %in% (
-      df_summary |> 
-        filter(
-          pf_burn == FALSE
-        ) |> 
-        pull(dut_id)
-    )
-  ) |> 
-  ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
-  geom_path() +
-  coord_cartesian(xlim = c(8, 30), ylim = c(0, 6)) +
-  # scale_y_continuous(breaks = seq(0, 200, 20)) +
-  facet_wrap(~ dut_id) +
-  labs(
-    title = str_glue("{work_order} burn-in failures LI curves zoom, 50C"),
-    x = "Current (mA)",
-    y = "Power (mW)"
-  ) +
-  theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
-    axis.text.x = element_text(angle = -90),
-    axis.text = element_text(size = 6)
-  )
-
-```
-
-## VI curves
-
-```{r}
-#| label: vi-curves-burn
-#| fig-width: 8
-#| fig-height: 8
-
-df_liv |> 
-  filter(
-    dut_id %in% (
-      df_summary |> 
-        filter(
-          pf_burn == FALSE
-        ) |> 
-        pull(dut_id)
-    )
-  ) |> 
-  ggplot(aes(x = current/1e-3, y = voltage, color = bi_status)) +
-  geom_path() +
-  coord_cartesian(ylim = c(0, 4)) +
-  # scale_y_continuous(breaks = seq(0, 10, 0.5)) +
-  facet_wrap(~ dut_id) +
-  labs(
-    title = str_glue("{work_order} burn-in VI curves, 50C"),
-    x = "Current (mA)",
-    y = "Voltage (V)"
-  ) +
-  theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
-    axis.text.x = element_text(angle = -90),
-    axis.text = element_text(size = 6)
-  )
-
-```
-
-
 :::
+
+
