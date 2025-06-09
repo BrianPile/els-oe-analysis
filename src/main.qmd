@@ -116,39 +116,7 @@ df_summary = df_summary |>
     )
   )
 
-# assign pass/fail result codes
-df_summary = df_summary |> 
-  mutate(
-    result_code =
-      case_when(
-        bi_status == "pre" ~ case_when(
-          pf_Vf_lo   == FALSE ~ "Vf_lo",
-          pf_Vf_hi   == FALSE ~ "Vf_hi",
-          pf_Pf   == FALSE ~ "Pf",
-          pf_Ith   == FALSE ~ "Ith",
-          # pf_SMSR3 == FALSE ~ "SMSR",
-          # pf_Lp3   == FALSE ~ "Lp",
-          pf_KINK  == FALSE ~ "kink",
-          pf_Idark == FALSE ~ "Idark",
-          pf_Ifmpd == FALSE ~ "Ifmpd",
-          pf_specs == TRUE ~ "PASS SPEC",
-          .default = "?"
-        ),
-        bi_status == "post" ~ case_when(
-          pf_Vf_lo   == FALSE ~ "Vf_lo",
-          pf_Vf_hi   == FALSE ~ "Vf_hi",
-          pf_Pf   == FALSE ~ "Pf",
-          pf_Ith   == FALSE ~ "Ith",
-          pf_SMSR == FALSE ~ "SMSR",
-          # pf_Lp3   == FALSE ~ "Lp",
-          pf_KINK  == FALSE ~ "kink",
-          # pf_Idark == FALSE ~ "Idark",
-          # pf_Ifmpd == FALSE ~ "Ifmpd",
-          pf_specs == TRUE ~ "PASS SPEC",
-          .default = "?"
-        )
-      )
-  )
+
 
 ```
 
@@ -178,6 +146,50 @@ df_summary = df_summary |>
   )
 
 ```
+
+```{r}
+#| label: assign-pf-codes
+
+df_summary = df_summary |> 
+  mutate(
+    result_code =
+      case_when(
+        bi_status == "pre" ~ case_when(
+          pf_Vf_lo   == FALSE ~ "Vf_lo",
+          pf_Vf_hi   == FALSE ~ "Vf_hi",
+          pf_Pf   == FALSE ~ "Pf",
+          pf_Ith   == FALSE ~ "Ith",
+          # pf_SMSR3 == FALSE ~ "SMSR",
+          # pf_Lp3   == FALSE ~ "Lp",
+          pf_KINK  == FALSE ~ "kink",
+          pf_Idark == FALSE ~ "Idark",
+          pf_Ifmpd == FALSE ~ "Ifmpd",
+          pf_specs == TRUE ~ "PASS SPEC",
+          .default = "?"
+        ),
+        bi_status == "post" ~ case_when(
+          pf_Vf_lo   == FALSE ~ "Vf_lo",
+          pf_Vf_hi   == FALSE ~ "Vf_hi",
+          pf_Pf   == FALSE ~ "Pf",
+          pf_Ith   == FALSE ~ "Ith",
+          pf_SMSR == FALSE ~ "SMSR",
+          # pf_Lp3   == FALSE ~ "Lp",
+          pf_KINK  == FALSE ~ "kink",
+          # pf_Idark == FALSE ~ "Idark",
+          # pf_Ifmpd == FALSE ~ "Ifmpd",
+          # pf_specs == TRUE ~ "PASS SPEC",
+          # pf_dIth1d == FALSE ~ "dIth",
+          # pf_dPf2 == FALSE ~ "dPf",
+          pf_burn == FALSE ~ "burn",
+          pf_final == TRUE ~ "PASS FINAL",
+          .default = "?"
+        )
+      )
+  )
+
+```
+
+
 
 ```{r}
 #| label: pf-judgement-oe
@@ -447,27 +459,6 @@ df_summary |>
 ```{r}
 #| label: pass-rate-col-plots
 
-# # pass rates bar chart
-# df_yield_channel |> 
-#   filter(
-#     bi_status == "pre",
-#     is.na(yield) == FALSE
-#   ) |> 
-#   mutate(parameter = fct_reorder(parameter, yield, .desc = TRUE)) |> 
-#   ggplot(aes(x = parameter, y = yield)) +
-#   geom_col() +
-#   geom_text(
-#     aes(label = paste0(round(100*yield, 0), "%")),
-#     vjust = -0.5
-#   ) +
-#   coord_cartesian(ylim = c(NA, 1.05)) +
-#   scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
-#   labs(
-#     title = "Pre burn-in criteria pass rates",
-#     x = "Parameter",
-#     y = NULL
-#   )
-
 for (status in c("pre", "post")) { 
   
   # pass rates bar chart
@@ -501,41 +492,80 @@ for (status in c("pre", "post")) {
 ```{r}
 #| label: failure-pareto
 
-# failure Pareto
-df_summary |> 
-  filter(bi_status == "pre") |> 
-  summarize(
-    .by = c(bi_status, result_code),
-    n = n()
-  ) |> 
-  mutate(
-    .by = c(bi_status),
-    rate = n/sum(n)
-  ) |> 
-  arrange(bi_status) |> 
-  mutate(
-    result_code = fct_reorder(result_code, rate, .desc = TRUE),
-    bar_color = if_else(result_code == "PASS SPEC", "green", "red")
-  ) |> 
-  ggplot(aes(x = result_code, y = rate, fill = bar_color)) +
-  geom_col(color = "black") +
-  geom_text(
-    aes(label = paste0(round(100*rate, 0), "%")),
-    vjust = -0.5
-  ) +
-  coord_cartesian(ylim = c(NA, 1.05)) +
-  scale_fill_identity() +
-  scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
-  labs(
-    title = "Pre burn-in Pareto of first-failed criteria",
-    x = "Parameter",
-    y = NULL,
-    caption = "Note: result depends on the order in which the parameters are checked"
-  ) +
-  theme(
-    plot.caption = element_text(hjust = 0)
-  )
+# # failure Pareto
+# df_summary |> 
+#   filter(bi_status == "pre") |> 
+#   summarize(
+#     .by = c(bi_status, result_code),
+#     n = n()
+#   ) |> 
+#   mutate(
+#     .by = c(bi_status),
+#     rate = n/sum(n)
+#   ) |> 
+#   arrange(bi_status) |> 
+#   mutate(
+#     result_code = fct_reorder(result_code, rate, .desc = TRUE),
+#     bar_color = if_else(result_code == "PASS SPEC", "green", "red")
+#   ) |> 
+#   ggplot(aes(x = result_code, y = rate, fill = bar_color)) +
+#   geom_col(color = "black") +
+#   geom_text(
+#     aes(label = paste0(round(100*rate, 0), "%")),
+#     vjust = -0.5
+#   ) +
+#   coord_cartesian(ylim = c(NA, 1.05)) +
+#   scale_fill_identity() +
+#   scale_x_discrete(drop = FALSE) +
+#   scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
+#   labs(
+#     title = "Pre burn-in Pareto of first-failed criteria",
+#     x = "Parameter",
+#     y = NULL,
+#     caption = "Note: result depends on the order in which the parameters are checked"
+#   ) +
+#   theme(
+#     plot.caption = element_text(hjust = 0)
+#   )
+
+for (status in c("pre", "post")) {
+  
+  p = df_summary |> 
+    filter(bi_status == status) |> 
+    summarize(
+      .by = c(bi_status, result_code),
+      n = n()
+    ) |> 
+    mutate(
+      .by = c(bi_status),
+      rate = n/sum(n)
+    ) |> 
+    arrange(bi_status) |> 
+    mutate(
+      result_code = fct_reorder(result_code, rate, .desc = TRUE),
+      bar_color = if_else(result_code %in% c("PASS SPEC", "PASS FINAL"), "green", "red")
+    ) |> 
+    ggplot(aes(x = result_code, y = rate, fill = bar_color)) +
+    geom_col(color = "black") +
+    geom_text(
+      aes(label = paste0(round(100*rate, 0), "%")),
+      vjust = -0.5
+    ) +
+    coord_cartesian(ylim = c(NA, 1.05)) +
+    scale_fill_identity() +
+    scale_x_discrete(drop = FALSE) +
+    scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
+    labs(
+      title = str_glue("{work_order} {status} burn-in Pareto of first-failed criteria"),
+      x = "Parameter",
+      y = NULL,
+      caption = "Note: result depends on the order in which the parameters are checked"
+    ) +
+    theme(
+      plot.caption = element_text(hjust = 0)
+    )
+  print(p)
+}
 
 ```
 
