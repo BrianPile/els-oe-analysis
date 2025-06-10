@@ -101,7 +101,7 @@ df_summary = df_summary |>
     pf_KINK   = if_else(abs(KINK) <= 30,       TRUE, FALSE, NA),
     pf_SMSR   = case_when(
       bi_status == "pre" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
-      bi_status == "post" ~ if_else(SMSR2 >= 35, TRUE, FALSE, FALSE),
+      bi_status == "post" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
       .default = NULL
     ),
     pf_specs  = case_when(
@@ -133,7 +133,7 @@ df_summary = df_summary |>
     ),
     pf_burn   = if_all(pf_dIth1d:pf_dPf2),
     pf_final = case_when(
-      bi_status == "post" ~ pf_specs & pf_burn,
+      bi_status == "post" ~ if_else(is.na(pf_specs), FALSE, pf_specs) & pf_burn,
       .default = NA
     )
   )
@@ -336,7 +336,6 @@ df_yield_oe |>
 #| label: parametric-results
 
 for (status in c("pre", "post")) {
-  
   
   facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
           "dIth1d", "dPf2", "burn", "final")
