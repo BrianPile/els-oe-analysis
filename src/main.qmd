@@ -106,8 +106,7 @@ df_summary = df_summary |>
     ),
     pf_specs  = case_when(
       bi_status == "pre" ~ if_all(c(pf_Ith:pf_KINK)),
-      bi_status == "post" ~ if_all(pf_Ith:pf_SMSR),
-      .default = NA
+      bi_status == "post" ~ if_all(pf_Ith:pf_SMSR, \(x) if_else(is.na(x), FALSE, x))
     )
   )
 
@@ -272,7 +271,7 @@ df_stats_liv = df_summary |>
 #| label: ld-level-yield-table
 
 df_yield_channel |> 
-  drop_na() |> 
+  # drop_na() |> 
   filter(
     parameter %in% c("specs", "burn", "final"),
     fails + passes == n_total
