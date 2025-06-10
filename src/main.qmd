@@ -214,7 +214,9 @@ df_yield_channel = df_summary |>
 df_yield_oe =   df_summary |> 
     summarize(
       .by = c(bi_status, fc_id),
-      pf_oe_spec = all(pf_specs),
+      pf_oe_spec = all(
+        if_else(is.na(pf_specs), FALSE, pf_specs)
+      ),
       pf_oe_burn = all(pf_burn)
     ) |> 
     mutate(
@@ -302,9 +304,9 @@ df_yield_oe |>
     across(
       .cols = starts_with("pf_"),
       .fns = list(
-        fails = \(x) sum(!x),
-        passes = \(x) sum(x),
-        yield = \(x) sum(x)/n()
+        fails = \(x) sum(!x, na.rm = FALSE),
+        passes = \(x) sum(x, na.rm = FALSE),
+        yield = \(x) sum(x, na.rm = FALSE)/n()
       )
     )
   ) |> 
@@ -321,7 +323,7 @@ df_yield_oe |>
     `pass count` = passes,
     `yield (%)` = yield
   ) |> 
-  drop_na() |> 
+  drop_na() |>
   gt() |> 
   tab_header(
     title = str_glue("{work_order} OE-level Yield")
