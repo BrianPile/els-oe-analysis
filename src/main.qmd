@@ -27,6 +27,8 @@ source(here("local_config.R"))
 source(here("src/summary_analysis_funcs.R"))
 
 
+# NOW!
+# TODO: make the yield based on LDs only
 
 
 # TOP PRIORITY
@@ -34,7 +36,8 @@ source(here("src/summary_analysis_funcs.R"))
 # 25FC01511-4
 # 25FC01516-1
 
-# MISC
+
+# Next
 # TODO: create a render_quarto.R script to control the output html file location and name
 # TODO: add timestamp?
 # TODO: wavelength spacing pass/fail - this is tough to do!!!
@@ -86,9 +89,9 @@ df_summary = join_the_summaries(df_summary_liv, df_summary_osa, df_summary_mpd)
 ```
 
 ```{r}
-#| label: pf-judgement-specs
+#| label: pf-judgement-specs-ld
 
-# apply spec limits
+# apply ld spec limits
 df_summary = df_summary |> 
   mutate(
     pf_Ith    = if_else(Ith1d <= 30,           TRUE, FALSE, NA),
@@ -96,17 +99,13 @@ df_summary = df_summary |>
     pf_Vf_hi  = if_else(Vf2 <= 2.0,            TRUE, FALSE, NA),
     pf_Pf     = if_else(Pf2 >= 80,             TRUE, FALSE, NA),
     pf_KINK   = if_else(abs(KINK) <= 30,       TRUE, FALSE, NA),
-    
     pf_SMSR   = case_when(
       bi_status == "pre" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
       bi_status == "post" ~ if_else(SMSR2 >= 35, TRUE, FALSE, FALSE),
       .default = NULL
     ),
-    
-    pf_Idark  = if_else(abs(Idark) <= 10e-9 ,  TRUE, FALSE, NA),
-    pf_Ifmpd  = if_else(abs(If_mpd) >=1e-3,    TRUE, FALSE, NA),
     pf_specs  = case_when(
-      bi_status == "pre" ~ if_all(c(pf_Ith:pf_KINK, pf_Idark, pf_Ifmpd)),
+      bi_status == "pre" ~ if_all(c(pf_Ith:pf_KINK)),
       bi_status == "post" ~ if_all(pf_Ith:pf_SMSR),
       .default = NA
     )
@@ -156,8 +155,6 @@ df_summary = df_summary |>
           # pf_SMSR3 == FALSE ~ "SMSR",
           # pf_Lp3   == FALSE ~ "Lp",
           pf_KINK  == FALSE ~ "kink",
-          pf_Idark == FALSE ~ "Idark",
-          pf_Ifmpd == FALSE ~ "Ifmpd",
           pf_specs == TRUE ~ "PASS SPEC",
           .default = "?"
         ),
@@ -182,8 +179,6 @@ df_summary = df_summary |>
   )
 
 ```
-
-
 
 ```{r}
 #| label: pf-judgement-oe
@@ -235,7 +230,7 @@ df_summary |>
   mutate(across(where(is.numeric), \(x) round(x, 3))) |> 
   data.table::fwrite(file = here("data/output", str_glue("{work_order} summary data.csv")))
 
-message("Created output summary data csv file!!!")
+# message("Created output summary data csv file!!!")
 
 ```
 
@@ -335,71 +330,41 @@ df_yield_oe |>
 
 ```
 
-
-
-
-
 ## parametric results
 
 ```{r}
-#| label: pre-burn-parametric-results
+#| label: parametric-results
 
-facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
-          "dIth1d", "dPf2")
-
-df_summary |> 
-  filter(bi_status == "pre") |> 
-  select(fc_id, ch, dut_id, starts_with("pf_")) |> 
-  pivot_longer(
-    cols = starts_with("pf_"),
-    names_prefix = "pf_"
-  ) |> 
-  mutate(name = fct_relevel(name, facts)) |> 
-  ggplot(aes(x = ch, y = fc_id, fill = value)) +
-  geom_tile(color = "black", show.legend = FALSE) +
-  scale_y_discrete(limits = rev) +
-  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-  facet_wrap(~ name, nrow = 1) +
-  labs(
-    title = str_glue("{work_order} pre burn-in parametric results")
-  ) +
-  theme(
-    axis.title = element_blank(),
-    axis.text = element_text(size = 8),
-    axis.text.x = element_text(angle = 0)
-  )
-
-```
-
-```{r}
-#| label: post-burn-parametric-results
-# fig-width: 8
-# fig-height: 8
-
-facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "Ifmpd", "specs",
+for (status in c("pre", "post")) {
+  
+  
+  facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
           "dIth1d", "dPf2", "burn", "final")
-
-df_summary |> 
-  filter(bi_status == "post") |> 
-  select(fc_id, ch, dut_id, starts_with("pf_")) |> 
-  pivot_longer(
-    cols = starts_with("pf_"),
-    names_prefix = "pf_"
-  ) |> 
-  mutate(name = fct_relevel(name, facts)) |> 
-  ggplot(aes(x = ch, y = fc_id, fill = value)) +
-  geom_tile(color = "black", show.legend = FALSE) +
-  scale_y_discrete(limits = rev) +
-  scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
-  facet_wrap(~ name, nrow = 1) +
-  labs(
-    title = str_glue("{work_order} post burn-in parametric results")
-  ) +
-  theme(
-    axis.title = element_blank(),
-    axis.text = element_text(size = 8),
-    axis.text.x = element_text(angle = 0)
-  )
+  
+  p = df_summary |> 
+    filter(bi_status == status) |> 
+    select(fc_id, ch, dut_id, starts_with("pf_")) |> 
+    pivot_longer(
+      cols = starts_with("pf_"),
+      names_prefix = "pf_"
+    ) |> 
+    mutate(name = fct_relevel(name, facts)) |> 
+    ggplot(aes(x = ch, y = fc_id, fill = value)) +
+    geom_tile(color = "black", show.legend = FALSE) +
+    scale_y_discrete(limits = rev) +
+    scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red")) +
+    facet_wrap(~ name, nrow = 1) +
+    labs(
+      title = str_glue("{work_order} {status} burn-in parametric results")
+    ) +
+    theme(
+      axis.title = element_blank(),
+      axis.text = element_text(size = 8),
+      axis.text.x = element_text(angle = 0)
+    )
+  print(p)
+  
+}
 
 ```
 
@@ -427,8 +392,8 @@ for (status in c("pre", "post")) {
     scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
     # facet_wrap(~ bi_status, scales = "free_x") +
     labs(
-      title = str_glue("{work_order} {status} burn-in criteria pass rates"),
-      x = "Parameter",
+      title = str_glue("{work_order} {status} burn-in spec pass rates"),
+      x = NULL,
       y = NULL
     )
   print(p)
@@ -469,7 +434,7 @@ for (status in c("pre", "post")) {
     scale_x_discrete(drop = FALSE) +
     scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
     labs(
-      title = str_glue("{work_order} {status} burn-in Pareto of first-failed criteria"),
+      title = str_glue("{work_order} {status} burn-in Pareto of first-failed spec"),
       x = "Parameter",
       y = NULL,
       caption = "Note: result depends on the order in which the parameters are checked"
@@ -481,12 +446,6 @@ for (status in c("pre", "post")) {
 }
 
 ```
-
-
-
-## burn-in pick list
-
-
 
 # Characteristic Plots
 
@@ -914,7 +873,6 @@ df_summary |>
     title = "Burn-in ΔIth CDF, 50C",
     x = "ΔIth (%)"
   )
-  
 
 ```
 
