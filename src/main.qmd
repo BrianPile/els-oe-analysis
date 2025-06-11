@@ -98,7 +98,7 @@ df_summary = df_summary |>
     pf_Vf_lo  = if_else(Vf2 >= 1.2,            TRUE, FALSE, NA),
     pf_Vf_hi  = if_else(Vf2 <= 2.0,            TRUE, FALSE, NA),
     pf_Pf     = if_else(Pf2 >= 80,             TRUE, FALSE, NA),
-    pf_KINK   = if_else(abs(KINK) <= 30,       TRUE, FALSE, NA),
+    pf_KINK   = if_else(abs(KINK) <= 40,       TRUE, FALSE, NA),
     pf_SMSR   = case_when(
       bi_status == "pre" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
       bi_status == "post" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
