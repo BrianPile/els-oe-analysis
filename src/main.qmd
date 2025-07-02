@@ -28,8 +28,9 @@ source(here("src/summary_analysis_funcs.R"))
 
 
 # NOW!
-# TODO: make the yield based on LDs only
-
+# !!!!!!!!
+# TODO: make the yield based on LDs only, and LIV data only!
+# !!!!!!!!
 
 # TOP PRIORITY
 # TODO: problem in summary data. If_osa1 is sometimes 400 when it should always be 100???
@@ -83,7 +84,14 @@ source(here("src/load_combined_data.R"))
 
 df_summary_mpd = summarize_mpd_data(df_mpd_iv)
 df_summary_liv = summarize_liv_data(df_liv)
-df_summary_osa = summarize_osa_data(df_osa)
+
+if (exists("df_osa")){
+  df_summary_osa = summarize_osa_data(df_osa)
+} else {
+  warning("df_osa does not exist, setting it to NULL")
+  df_summary_osa = NULL
+}
+
 df_summary = join_the_summaries(df_summary_liv, df_summary_osa, df_summary_mpd)
 
 ```
@@ -94,19 +102,22 @@ df_summary = join_the_summaries(df_summary_liv, df_summary_osa, df_summary_mpd)
 # apply ld spec limits
 df_summary = df_summary |> 
   mutate(
-    pf_Ith    = if_else(Ith1d <= 30,           TRUE, FALSE, NA),
-    pf_Vf_lo  = if_else(Vf2 >= 1.2,            TRUE, FALSE, NA),
-    pf_Vf_hi  = if_else(Vf2 <= 2.0,            TRUE, FALSE, NA),
-    pf_Pf     = if_else(Pf2 >= 80,             TRUE, FALSE, NA),
-    pf_KINK   = if_else(abs(KINK) <= 40,       TRUE, FALSE, NA),
-    pf_SMSR   = case_when(
-      bi_status == "pre" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
-      bi_status == "post" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
-      .default = NULL
-    ),
+    pf_Ith    = if_else(Ith1d <= 30,             TRUE, FALSE, NA),
+    pf_Vf_lo  = if_else(Vf2 >= 1.2,              TRUE, FALSE, NA),
+    pf_Vf_hi  = if_else(Vf2 <= 2.0,              TRUE, FALSE, NA),
+    pf_Pf     = if_else(Pf2 >= 80,               TRUE, FALSE, NA),
+    pf_KINK   = if_else(abs(KINK) <= 40,         TRUE, FALSE, NA),
+    # pf_SMSR   = case_when(
+    #   bi_status == "pre" ~ if_else(SMSR2 >= 35,  TRUE, FALSE, NA),
+    #   bi_status == "post" ~ if_else(SMSR2 >= 35, TRUE, FALSE, NA),
+    #   .default = NULL
+    # ),
+    # pf_Idark = if_else(abs(Idark) < 10e-9,       TRUE, FALSE, NA),
     pf_specs  = case_when(
-      bi_status == "pre" ~ if_all(c(pf_Ith:pf_KINK)),
-      bi_status == "post" ~ if_all(pf_Ith:pf_SMSR, \(x) if_else(is.na(x), FALSE, x))
+      # bi_status == "pre" ~ if_all(c(pf_Ith:pf_KINK, Idark), \(x) if_else(is.na(x), NA, x)),
+      bi_status == "pre" ~ if_all(pf_Ith:pf_KINK,  \(x) if_else(is.na(x), NA, x)),
+      bi_status == "post" ~ if_all(pf_Ith:pf_KINK, \(x) if_else(is.na(x), NA, x)),
+      # bi_status == "post" ~ if_all(pf_Ith:pf_SMSR, \(x) if_else(is.na(x), NA, x))
     )
   )
 
@@ -119,7 +130,7 @@ df_summary = df_summary |>
   mutate(
     .by = c(dut_id),
     dIth1d_pct = 100 * (Ith1d/first(Ith1d, order_by = bi_status) - 1),
-    dPf2_pct = 100 * (Pf2/first(Pf2, order_by = bi_status) - 1)
+    dPf2_pct   = 100 * (Pf2/first(Pf2, order_by = bi_status) - 1)
   ) |> 
   mutate(
     pf_dIth1d = case_when(
@@ -130,9 +141,9 @@ df_summary = df_summary |>
       bi_status == "post" ~ if_else(abs(dPf2_pct)   <= 10, TRUE, FALSE, FALSE),
       .default = NA
     ),
-    pf_burn   = if_all(pf_dIth1d:pf_dPf2),
+    pf_burn  = if_all(pf_dIth1d:pf_dPf2),
     pf_final = case_when(
-      bi_status == "post" ~ if_else(is.na(pf_specs), FALSE, pf_specs) & pf_burn,
+      bi_status == "post" ~ if_else(is.na(pf_specs), NA, pf_specs) & pf_burn,
       .default = NA
     )
   )
@@ -162,7 +173,7 @@ df_summary = df_summary |>
           pf_Vf_hi   == FALSE ~ "Vf_hi",
           pf_Pf   == FALSE ~ "Pf",
           pf_Ith   == FALSE ~ "Ith",
-          pf_SMSR == FALSE ~ "SMSR",
+          # pf_SMSR == FALSE ~ "SMSR",
           # pf_Lp3   == FALSE ~ "Lp",
           pf_KINK  == FALSE ~ "kink",
           # pf_Idark == FALSE ~ "Idark",
@@ -200,6 +211,7 @@ df_yield_channel = df_summary |>
       .fns = list(
         fails = \(x) sum(!x, na.rm = TRUE),
         passes = \(x) sum(x, na.rm = TRUE),
+        na= \(x) sum(is.na(x)),
         yield = \(x) sum(x, na.rm = TRUE)/n()
       )
     )
@@ -210,17 +222,30 @@ df_yield_channel = df_summary |>
     names_pattern = "pf_(.+)_(.*)"
   )
 
-df_yield_oe =   df_summary |> 
-    summarize(
-      .by = c(bi_status, fc_id),
-      pf_oe_spec = all(
-        if_else(is.na(pf_specs), FALSE, pf_specs)
-      ),
-      pf_oe_burn = all(pf_burn)
-    ) |> 
-    mutate(
-      pf_oe_final = if_else(bi_status == "post", pf_oe_spec & pf_oe_burn, NA)
-    )
+df_yield_oe = df_summary |> 
+  summarize(
+    .by = c(bi_status, fc_id),
+    pf_oe_spec = if_else(
+      condition = any(is.na(pf_specs)),
+      true = NA,
+      false = all(pf_specs)
+    ),
+    pf_oe_burn = all(pf_burn)
+  ) |> 
+  mutate(
+    pf_oe_final = if_else(bi_status == "post", pf_oe_spec & pf_oe_burn, NA)
+  )
+
+# df_yield_oe |> 
+#   pivot_longer(
+#     cols = starts_with("pf_")
+#   ) |> 
+#   mutate(name = fct_relevel(name, "pf_oe_spec")) |> 
+#   ggplot(aes(x = name, y = fc_id, fill = value)) +
+#   geom_tile(color = "black") +
+#   scale_y_discrete(limits = rev) +
+#   scale_fill_manual(values = c("TRUE" = "green", "FALSE" = "red"))
+
     
 ```
 
@@ -274,7 +299,7 @@ df_yield_channel |>
   # drop_na() |> 
   filter(
     parameter %in% c("specs", "burn", "final"),
-    fails + passes == n_total
+    !(fails == 0 & passes == 0)
   ) |> 
   mutate(yield = round(100*yield)) |> 
   rename(
@@ -291,21 +316,20 @@ df_yield_channel |>
 ```
 
 
-
-
 ```{r}
 #| label: OE-level-yield-table
 
 df_yield_oe |> 
+  filter(!is.na(pf_oe_spec)) |> 
   summarize(
     .by = bi_status,
     n_total = n(),
     across(
       .cols = starts_with("pf_"),
       .fns = list(
-        fails = \(x) sum(!x, na.rm = FALSE),
-        passes = \(x) sum(x, na.rm = FALSE),
-        yield = \(x) sum(x, na.rm = FALSE)/n()
+        fails = \(x) sum(!x, na.rm = TRUE),
+        passes = \(x) sum(x, na.rm = TRUE),
+        yield = \(x) sum(x, na.rm = TRUE)/n()
       )
     )
   ) |> 
@@ -315,6 +339,9 @@ df_yield_oe |>
     names_pattern = "pf_oe_(.+)_(.+)"
   ) |> 
   mutate(yield = round(100*yield)) |> 
+  filter(
+    !(fails == 0 & passes == 0)
+  ) |>
   rename(
     `burn-in status` = bi_status,
     ss = n_total,
@@ -335,11 +362,16 @@ df_yield_oe |>
 
 ```{r}
 #| label: parametric-results
+#| fig-width: 8
+#| fig-height: 8
 
-for (status in c("pre", "post")) {
+for (status in unique(df_summary$bi_status)) {
   
   facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
           "dIth1d", "dPf2", "burn", "final")
+  
+  # facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "specs",
+  #           "dIth1d", "dPf2", "burn", "final")
   
   p = df_summary |> 
     filter(bi_status == status) |> 
@@ -363,7 +395,7 @@ for (status in c("pre", "post")) {
       axis.text.x = element_text(angle = 0)
     )
   print(p)
-  
+
 }
 
 ```
@@ -373,7 +405,7 @@ for (status in c("pre", "post")) {
 ```{r}
 #| label: pass-rate-col-plots
 
-for (status in c("pre", "post")) { 
+for (status in unique(df_summary$bi_status)) { 
   
   # pass rates bar chart
   p = df_yield_channel |> 
@@ -406,7 +438,7 @@ for (status in c("pre", "post")) {
 ```{r}
 #| label: failure-pareto
 
-for (status in c("pre", "post")) {
+for (status in unique(df_summary$bi_status)) {
   
   p = df_summary |> 
     filter(bi_status == status) |> 
@@ -507,6 +539,66 @@ df_liv |>
 
 ```
 
+## MPD Ipd curves
+
+```{r}
+#| label: ipd-curves
+#| fig-width: 8
+#| fig-height: 8
+
+df_liv |> 
+  # filter(bi_status == "pre") |> 
+  ggplot(aes(x = current/1e-3, y = mpd_current/1e-6, color = ch)) +
+  # annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
+  #          fill = "gray90", color = "gray40", alpha = 0.5) +
+  geom_path() +
+  # geom_hline(yintercept = 80, color = "gray") +
+  # geom_vline(xintercept = 400) +
+  coord_cartesian(ylim = c(0, 2)) +
+  # scale_y_continuous(breaks = seq(0, 200, 20)) +
+  facet_wrap(fc_id ~ bi_status) +
+  labs(
+    title = str_glue("{work_order} LI curves, 50C"),
+    x = "Current (mA)",
+    # y = "Power (mW)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1)),
+    axis.text.x = element_text(angle = -90)
+  )
+
+```
+
+## MPD tracking curves
+
+```{r}
+#| label: mpd-tracking-curves
+# fig-width: 8
+# fig-height: 8
+
+df_liv |> 
+  # filter(bi_status == "pre") |> 
+  ggplot(aes(x = power, y = mpd_current, color = ch)) +
+  # annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
+  #          fill = "gray90", color = "gray40", alpha = 0.5) +
+  geom_path() +
+  # geom_hline(yintercept = 80, color = "gray") +
+  # geom_vline(xintercept = 400) +
+  # coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
+  # scale_y_continuous(breaks = seq(0, 200, 20)) +
+  facet_wrap(fc_id ~ bi_status) +
+  labs(
+    title = str_glue("{work_order} LI curves, 50C"),
+    # x = "Current (mA)",
+    # y = "Power (mW)"
+  ) +
+  theme(
+    strip.text = element_text(margin = margin(1,1,1,1)),
+    axis.text.x = element_text(angle = -90)
+  )
+
+```
+
 ## MPD IV curves
 
 ```{r}
@@ -538,21 +630,28 @@ df_mpd_iv |>
 #| fig-width: 8
 #| fig-height: 8
 
-df_osa |> 
-  filter(If == 400e-3,
-         wavelength |> between(1565, 1585)) |> 
-  ggplot(aes(x = wavelength, y = power, color = ch)) +
-  geom_path() +
-  coord_cartesian(ylim = c(-80, 20)) +
-  facet_wrap(fc_id ~ bi_status) +
-  labs(
-    title = str_glue("{work_order} Spectra, 400mA, 50C"),
-    x = "Wavelength (nm)",
-    y = "Power (dBm)"
-  ) +
-  theme(
-    strip.text = element_text(margin = margin(1,1,1,1))
-  )
+
+if (exists("df_osa")) {
+  
+  df_osa |> 
+    filter(If == 400e-3,
+           wavelength |> between(1565, 1585)) |> 
+    ggplot(aes(x = wavelength, y = power, color = ch)) +
+    geom_path() +
+    coord_cartesian(ylim = c(-80, 20)) +
+    facet_wrap(fc_id ~ bi_status) +
+    labs(
+      title = str_glue("{work_order} Spectra, 400mA, 50C"),
+      x = "Wavelength (nm)",
+      y = "Power (dBm)"
+    ) +
+    theme(
+      strip.text = element_text(margin = margin(1,1,1,1))
+    )
+  
+} else {
+  message("df_osa does not exist, skipping spectra plot")
+}
 
 ```
 
@@ -562,6 +661,8 @@ df_osa |>
 #| label: peak-wl
 #| fig-width: 8
 #| fig-height: 8
+
+if (!is.null(df_summary_osa)) {
 
 df_summary_osa |> 
   ggplot(aes(x = If/1e-3, y = Lp, color = ch)) +
@@ -577,7 +678,9 @@ df_summary_osa |>
     strip.text = element_text(margin = margin(1,1,1,1)),
     axis.text.x = element_text(angle = -90)
   )
-
+} else {
+  message("df_summary_osa is NULL, skipping peak WL plot")
+}
 ```
 
 ## SMSR
@@ -587,24 +690,27 @@ df_summary_osa |>
 #| fig-width: 8
 #| fig-height: 8
 
-df_summary_osa |> 
-  ggplot(aes(x = If/1e-3, y = SMSR, color = ch)) +
-  geom_line() +
-  geom_point() +
-  geom_hline(yintercept = 35) +
-  coord_cartesian(ylim = c(0, 70)) +
-  scale_y_continuous(breaks = seq(0, 100, 10)) +
-  facet_wrap(fc_id ~ bi_status) +
-  labs(
-    title = str_glue("{work_order} SMSR, 50C"),
-    x = "Current (mA)",
-    y = "SMSR (dB)"
-  ) +
-  theme(
-    strip.text = element_text(margin = margin(1,1,1,1)),
-    axis.text.x = element_text(angle = -90)
-  )
-
+if (!is.null(df_summary_osa)) {
+  df_summary_osa |> 
+    ggplot(aes(x = If/1e-3, y = SMSR, color = ch)) +
+    geom_line() +
+    geom_point() +
+    geom_hline(yintercept = 35) +
+    coord_cartesian(ylim = c(0, 70)) +
+    scale_y_continuous(breaks = seq(0, 100, 10)) +
+    facet_wrap(fc_id ~ bi_status) +
+    labs(
+      title = str_glue("{work_order} SMSR, 50C"),
+      x = "Current (mA)",
+      y = "SMSR (dB)"
+    ) +
+    theme(
+      strip.text = element_text(margin = margin(1,1,1,1)),
+      axis.text.x = element_text(angle = -90)
+    )
+} else {
+  message("df_summary_osa is NULL, skipping SMSR plot")
+}
 ```
 
 ## LI curves failures
@@ -614,33 +720,36 @@ df_summary_osa |>
 #| fig-width: 8
 #| fig-height: 8
 
-df_liv |> 
-  filter(
-    dut_id %in% (
-      df_summary |> 
-        filter(
-          pf_burn == FALSE
-        ) |> 
-        pull(dut_id)
-    )
-  ) |> 
-  ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
+if ("post" %in% df_summary$bi_status) {
+
+  df_liv |> 
+    filter(
+      dut_id %in% (
+        df_summary |> 
+          filter(
+            pf_burn == FALSE
+          ) |> 
+          pull(dut_id)
+      )
+    ) |> 
+    ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
     annotate(geom = "rect", xmin = 400, xmax = 5000, ymin = -100, ymax = 80,
-           fill = "gray90", color = "gray", alpha = 0.5) +
-  geom_path() +
-  coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
-  scale_y_continuous(breaks = seq(0, 200, 20)) +
-  facet_wrap(~ dut_id) +
-  labs(
-    title = str_glue("{work_order} burn-in failures LI curves, 50C"),
-    x = "Current (mA)",
-    y = "Power (mW)"
-  ) +
-  theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
-    axis.text.x = element_text(angle = -90),
-    axis.text = element_text(size = 6)
-  )
+             fill = "gray90", color = "gray", alpha = 0.5) +
+    geom_path() +
+    coord_cartesian(xlim = c(0, 500), ylim = c(0, 120)) +
+    scale_y_continuous(breaks = seq(0, 200, 20)) +
+    facet_wrap(~ dut_id) +
+    labs(
+      title = str_glue("{work_order} burn-in failures LI curves, 50C"),
+      x = "Current (mA)",
+      y = "Power (mW)"
+    ) +
+    theme(
+      strip.text = element_text(margin = margin(1,1,1,1), size = 8),
+      axis.text.x = element_text(angle = -90),
+      axis.text = element_text(size = 6)
+    )
+}
 
 ```
 
@@ -651,31 +760,33 @@ df_liv |>
 #| fig-width: 8
 #| fig-height: 8
 
-df_liv |> 
-  filter(
-    dut_id %in% (
-      df_summary |> 
-        filter(
-          pf_burn == FALSE
-        ) |> 
-        pull(dut_id)
+if ("post" %in% df_summary$bi_status){
+  df_liv |> 
+    filter(
+      dut_id %in% (
+        df_summary |> 
+          filter(
+            pf_burn == FALSE
+          ) |> 
+          pull(dut_id)
+      )
+    ) |> 
+    ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
+    geom_path() +
+    coord_cartesian(xlim = c(8, 30), ylim = c(0, 6)) +
+    # scale_y_continuous(breaks = seq(0, 200, 20)) +
+    facet_wrap(~ dut_id) +
+    labs(
+      title = str_glue("{work_order} burn-in failures LI curves zoom, 50C"),
+      x = "Current (mA)",
+      y = "Power (mW)"
+    ) +
+    theme(
+      strip.text = element_text(margin = margin(1,1,1,1), size = 8),
+      axis.text.x = element_text(angle = -90),
+      axis.text = element_text(size = 6)
     )
-  ) |> 
-  ggplot(aes(x = current/1e-3, y = power/1e-3, color = bi_status)) +
-  geom_path() +
-  coord_cartesian(xlim = c(8, 30), ylim = c(0, 6)) +
-  # scale_y_continuous(breaks = seq(0, 200, 20)) +
-  facet_wrap(~ dut_id) +
-  labs(
-    title = str_glue("{work_order} burn-in failures LI curves zoom, 50C"),
-    x = "Current (mA)",
-    y = "Power (mW)"
-  ) +
-  theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
-    axis.text.x = element_text(angle = -90),
-    axis.text = element_text(size = 6)
-  )
+}
 
 ```
 
@@ -686,31 +797,33 @@ df_liv |>
 #| fig-width: 8
 #| fig-height: 8
 
-df_liv |> 
-  filter(
-    dut_id %in% (
-      df_summary |> 
-        filter(
-          pf_burn == FALSE
-        ) |> 
-        pull(dut_id)
+if ("post" %in% df_summary$bi_status) {
+  df_liv |> 
+    filter(
+      dut_id %in% (
+        df_summary |> 
+          filter(
+            pf_burn == FALSE
+          ) |> 
+          pull(dut_id)
+      )
+    ) |> 
+    ggplot(aes(x = current/1e-3, y = voltage, color = bi_status)) +
+    geom_path() +
+    coord_cartesian(ylim = c(0, 4)) +
+    # scale_y_continuous(breaks = seq(0, 10, 0.5)) +
+    facet_wrap(~ dut_id) +
+    labs(
+      title = str_glue("{work_order} burn-in VI curves, 50C"),
+      x = "Current (mA)",
+      y = "Voltage (V)"
+    ) +
+    theme(
+      strip.text = element_text(margin = margin(1,1,1,1), size = 8),
+      axis.text.x = element_text(angle = -90),
+      axis.text = element_text(size = 6)
     )
-  ) |> 
-  ggplot(aes(x = current/1e-3, y = voltage, color = bi_status)) +
-  geom_path() +
-  coord_cartesian(ylim = c(0, 4)) +
-  # scale_y_continuous(breaks = seq(0, 10, 0.5)) +
-  facet_wrap(~ dut_id) +
-  labs(
-    title = str_glue("{work_order} burn-in VI curves, 50C"),
-    x = "Current (mA)",
-    y = "Voltage (V)"
-  ) +
-  theme(
-    strip.text = element_text(margin = margin(1,1,1,1), size = 8),
-    axis.text.x = element_text(angle = -90),
-    axis.text = element_text(size = 6)
-  )
+}
 
 ```
 
@@ -845,16 +958,18 @@ df_summary_liv |>
 ```{r}
 #| label: cdf-smsr
 
-df_summary_osa |> 
-  filter(If == 400e-3) |> 
-  plot_cdf(group_var = ch, value_var = SMSR) +
-  geom_vline(xintercept = c(35)) +
-  coord_cartesian(xlim = c(0, 70)) +
-  scale_x_continuous(breaks = seq(0, 100, 10)) +
-  labs(
-    title = str_glue("{work_order} SMSR CDF, 400mA, 50C"),
-    x = "SMSR (dB)"
-  )
+if (!is.null(df_summary_osa)) {
+  df_summary_osa |> 
+    filter(If == 400e-3) |> 
+    plot_cdf(group_var = ch, value_var = SMSR) +
+    geom_vline(xintercept = c(35)) +
+    coord_cartesian(xlim = c(0, 70)) +
+    scale_x_continuous(breaks = seq(0, 100, 10)) +
+    labs(
+      title = str_glue("{work_order} SMSR CDF, 400mA, 50C"),
+      x = "SMSR (dB)"
+    )
+}
 
 ```
 
@@ -863,16 +978,18 @@ df_summary_osa |>
 ```{r}
 #| label: cdf-dIth
 
-df_summary |> 
-  filter(bi_status == "post") |> 
-  plot_cdf(group_var = ch, value_var = dIth1d_pct) +
-  geom_vline(xintercept = c(-10, 10)) +
-  coord_cartesian(xlim = c(-40, 40)) +
-  scale_x_continuous(breaks = seq(-100, 100, 20)) +
-  labs(
-    title = "Burn-in ΔIth CDF, 50C",
-    x = "ΔIth (%)"
-  )
+if ("post" %in% df_summary$bi_status) {
+  df_summary |> 
+    filter(bi_status == "post") |> 
+    plot_cdf(group_var = ch, value_var = dIth1d_pct) +
+    geom_vline(xintercept = c(-10, 10)) +
+    coord_cartesian(xlim = c(-40, 40)) +
+    scale_x_continuous(breaks = seq(-100, 100, 20)) +
+    labs(
+      title = "Burn-in ΔIth CDF, 50C",
+      x = "ΔIth (%)"
+    )
+}
 
 ```
 
@@ -881,16 +998,18 @@ df_summary |>
 ```{r}
 #| label: cdf-dPf
 
-df_summary |> 
-  filter(bi_status == "post") |> 
-  plot_cdf(group_var = ch, value_var = dPf2_pct) +
-  geom_vline(xintercept = c(-10, 10)) +
-  coord_cartesian(xlim = c(-40, 40)) +
-  scale_x_continuous(breaks = seq(-100, 100, 20)) +
-  labs(
-    title = "Burn-in ΔPf CDF, 400mA, 50C",
-    x = "ΔPf (%)"
-  )
+if ("post" %in% df_summary$bi_status) {
+  df_summary |> 
+    filter(bi_status == "post") |> 
+    plot_cdf(group_var = ch, value_var = dPf2_pct) +
+    geom_vline(xintercept = c(-10, 10)) +
+    coord_cartesian(xlim = c(-40, 40)) +
+    scale_x_continuous(breaks = seq(-100, 100, 20)) +
+    labs(
+      title = "Burn-in ΔPf CDF, 400mA, 50C",
+      x = "ΔPf (%)"
+    )
+}
 
 ```
 

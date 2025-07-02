@@ -52,20 +52,32 @@ summarize_osa_data = function(data) {
 ## SUMMARY ----
 join_the_summaries = function(data1, data2, data3) {
   
-  df_summary_osa_wide = data2 |> 
-    rename(If_osa = If) |> 
-    filter(If_osa %in% c(100e-3, 400e-3)) |> 
-    # group_by(dut_id, test_id) |> 
-    group_by(dut_id) |> 
-    mutate(If_index = seq_along(If_osa),
-           If_osa = If_osa/1e-3) |> 
-    ungroup() |> 
-    pivot_wider(
-      names_from = If_index,
-      values_from = c(test_id, If_osa, Lp, SMSR),
-      names_sep = ""
-    ) |> 
-    arrange(dut_id)
+  
+  if (!is.null(data2)) {
+    
+    df_summary_osa_wide = data2 |> 
+      rename(If_osa = If) |> 
+      filter(If_osa %in% c(100e-3, 400e-3)) |> 
+      # group_by(dut_id, test_id) |> 
+      group_by(dut_id) |> 
+      mutate(If_index = seq_along(If_osa),
+             If_osa = If_osa/1e-3) |> 
+      ungroup() |> 
+      pivot_wider(
+        names_from = If_index,
+        values_from = c(test_id, If_osa, Lp, SMSR),
+        names_sep = ""
+      ) |> 
+      arrange(dut_id)
+    
+  } else {
+    
+    df_summary_osa_wide = data1 |> 
+      select(work_order, bi_status, fc_id, ch, dut_id, temperature) |> 
+      mutate(Lp2 = NA, SMSR2 = NA)
+    
+  }
+  
   
   df_summary = left_join(
     x = data1,

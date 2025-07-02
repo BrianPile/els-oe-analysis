@@ -60,27 +60,35 @@ df_liv = data.table::fread(
   )
 ) |> 
   as_tibble() |> 
+  complete(fc_id, ch = as.character(1:4)) |>
   mutate(dut_id = paste(sep = "-", fc_id, ch), .after = ch) |> 
+  mutate(bi_status = if_else(is.na(bi_status), "pre", bi_status)) |>
   mutate(bi_status = fct_relevel(bi_status, "pre", "post"))
 
 
 ## OSA ----
 filename_osa = paste(work_order, "OSA combined data.csv")
+file_path_osa = here("data", "processed", filename_osa)
+
 if (!file.exists(here("data/processed", filename_osa))) {
   message("Wrangling OSA!!!")
   combine_osa(filename = here("data/processed", filename_osa))
 }
 
-df_osa = data.table::fread(
-  file = here("data/processed", filename_osa),
-  colClasses = c(
-    bi_status = "factor",
-    ch = "character"
-  )
-) |> 
-  as_tibble() |> 
-  mutate(dut_id = paste(sep = "-", fc_id, ch), .after = ch) |> 
-  mutate(bi_status = factor(bi_status, levels = c("pre", "post")))
+if (file.exists(file_path_osa)) {
+  df_osa = data.table::fread(
+    file = file_path_osa,
+    colClasses = c(
+      bi_status = "factor",
+      ch = "character"
+    )
+  ) |> 
+    as_tibble() |> 
+    mutate(dut_id = paste(sep = "-", fc_id, ch), .after = ch) |> 
+    mutate(bi_status = factor(bi_status, levels = c("pre", "post")))
+} else {
+  warning(filename_osa, " not found!!!")
+}
 
 # cleanup some variables
 rm(filename_iv, filename_liv, filename_osa)
@@ -99,11 +107,17 @@ df_mpd_iv = df_mpd_iv |>
 df_liv = df_liv |> 
   filter(
     .by = c(bi_status, dut_id),
-    test_id == max(test_id)
+    if_else(
+      condition = is.na(test_id),
+      true = is.na(test_id),
+      false = test_id == max(test_id))
   )
 
-df_osa = df_osa |> 
-  filter(
-    .by = c(bi_status, dut_id, If),
-    test_id == max(test_id)
-  )
+if (exists("df_osa")) {
+  df_osa = df_osa |> 
+    filter(
+      .by = c(bi_status, dut_id, If),
+      test_id == max(test_id)
+    )
+  
+}
