@@ -130,7 +130,8 @@ df_summary = df_summary |>
   mutate(
     .by = c(dut_id),
     dIth1d_pct = 100 * (Ith1d/first(Ith1d, order_by = bi_status) - 1),
-    dPf2_pct   = 100 * (Pf2/first(Pf2, order_by = bi_status) - 1)
+    dPf2_pct   = 100 * (Pf2/first(Pf2, order_by = bi_status) - 1),
+    dVf2_pct   = 100 * (Vf2/first(Vf2, order_by = bi_status) - 1)
   ) |> 
   mutate(
     pf_dIth1d = case_when(
@@ -141,7 +142,11 @@ df_summary = df_summary |>
       bi_status == "post" ~ if_else(abs(dPf2_pct)   <= 10, TRUE, FALSE, FALSE),
       .default = NA
     ),
-    pf_burn  = if_all(pf_dIth1d:pf_dPf2),
+    pf_dVf2 = case_when(
+      bi_status == "post" ~ if_else(abs(dVf2_pct)   <= 10, TRUE, FALSE, FALSE),
+      .default = NA
+    ),
+    pf_burn  = if_all(pf_dIth1d:pf_dVf2),
     pf_final = case_when(
       bi_status == "post" ~ if_else(is.na(pf_specs), NA, pf_specs) & pf_burn,
       .default = NA
@@ -153,6 +158,8 @@ df_summary = df_summary |>
 ```{r}
 #| label: assign-pf-codes
 
+
+# performance codes
 df_summary = df_summary |> 
   mutate(
     result_code =
@@ -187,6 +194,23 @@ df_summary = df_summary |>
         )
       )
   )
+
+
+# burn-in codes
+df_summary_bi = df_summary |> 
+  mutate(
+    burn_code = case_when(
+      bi_status == "post" ~ case_when(
+        pf_dVf2 == FALSE ~ "dVf2",
+        pf_dIth1d == FALSE ~ "dIth",
+        pf_dPf2 == FALSE ~ "dPf2",
+        pf_burn == TRUE  ~ "PASS burn"
+      ),
+      .default = NA
+    )
+  )
+
+
 
 ```
 
@@ -367,8 +391,8 @@ df_yield_oe |>
 
 for (status in unique(df_summary$bi_status)) {
   
-  facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "specs",
-          "dIth1d", "dPf2", "burn", "final")
+  facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "specs",
+          "dVf2", "dIth1d", "dPf2", "burn", "final")
   
   # facts = c("Vf_lo", "Vf_hi", "Ith", "Pf", "KINK", "SMSR", "Idark", "specs",
   #           "dIth1d", "dPf2", "burn", "final")
@@ -433,7 +457,7 @@ for (status in unique(df_summary$bi_status)) {
 
 ```
 
-## failure Pareto
+## performance failure Pareto
 
 ```{r}
 #| label: failure-pareto
@@ -478,6 +502,44 @@ for (status in unique(df_summary$bi_status)) {
 }
 
 ```
+
+## burn-in failure Pareto
+
+```{r}
+#| label: bi-failure-pareto
+
+df_summary_bi |> 
+  filter(bi_status == "post") |>
+  summarize(
+    .by = c(burn_code),
+    n = n()
+  ) |> 
+  mutate(
+    rate = n/sum(n)
+  ) |> 
+  mutate(
+    burn_code = fct_reorder(burn_code, rate, .desc = TRUE),
+    bar_color = if_else(burn_code == "PASS burn", "green", "red")
+  ) |> 
+  ggplot(aes(x = burn_code, y = rate, fill = bar_color)) +
+  geom_col(color = "black") +
+  geom_text(
+    aes(label = paste0(round(100*rate, 0), "%")),
+    vjust = -0.5
+  ) +
+  scale_fill_identity() +
+  scale_x_discrete(drop = FALSE) +
+  coord_cartesian(ylim = c(NA, 1.05)) +
+  scale_y_continuous(breaks = seq(0, 1, 0.2), labels = scales::percent) +
+  labs(
+    title = str_glue("{work_order} burn-in Pareto"),
+    x = "Parameter",
+    y = NULL
+  )
+
+```
+
+
 
 # Characteristic Plots
 
